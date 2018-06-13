@@ -89,3 +89,50 @@ func TestMarshal(t *testing.T) {
     }
   })
 }
+
+func TestUnmarshal(t *testing.T) {
+
+  t.Run("One resource object", func(t *testing.T) {
+    payload := []byte(`{"data":{"type":"books","attributes":{"title":"Introducing Go","author":"Caleb Doxsey"}}}`)
+
+    actual   := Book{}
+    expected := Book{
+      Title:  "Introducing Go",
+      Author: "Caleb Doxsey",
+    }
+
+    Unmarshal(payload, &actual)
+
+    if actual.Title != expected.Title || actual.Author != expected.Author {
+      t.Log("\nActual:\t\t", actual, "\nExpected:\t", expected)
+      t.Fail()
+    }
+  })
+
+  t.Run("Many resource objects", func(t *testing.T) {
+    payload := []byte(`{"data":[{"type":"books","id":"1","attributes":{"title":"Introducing Go","author":"Caleb Doxsey"}},{"type":"books","id":"2","attributes":{"title":"An Introduction to Programming in Go","author":"Caleb Doxsey"}}]}`)
+
+    actual   := []*Book{}
+    expected := []Book{
+      {
+        ID:     "1",
+        Title:  "Introducing Go",
+        Author: "Caleb Doxsey",
+      },
+      {
+        ID:     "2",
+        Title:  "An Introduction to Programming in Go",
+        Author: "Caleb Doxsey",
+      },
+    }
+
+    Unmarshal(payload, &actual)
+
+    for i, _ := range actual {
+      if actual[i].ID != expected[i].ID || actual[i].Title != expected[i].Title || actual[i].Author != expected[i].Author {
+        t.Log("\nActual:\t\t", *actual[i], "\nExpected:\t", expected[i])
+        t.Fail()
+      }
+    }
+  })
+}
