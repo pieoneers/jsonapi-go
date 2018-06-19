@@ -18,20 +18,42 @@ type UnmarshalIdentifier interface {
   SetID(string) error
 }
 
+type MarshalRelationships interface {
+  GetRelationships() map[string]interface{}
+}
+
+type UnmarshalRelationships interface {
+  SetRelationships(map[string]interface{}) error
+}
+
 type Document struct {
-  Data     *Data        `json:"data,omitempty"`
+  Data   *DocumentData  `json:"data,omitempty"`
   Errors []*ErrorObject `json:"errors,omitempty"`
 }
 
-type Data struct {
+type DocumentData struct {
   One    *ResourceObject
   Many []*ResourceObject
 }
 
+type Relationship struct {
+  Data *RelationshipData `json:"data"`
+}
+
+type RelationshipData struct {
+  One    *ResourceObjectIdentifier
+  Many []*ResourceObjectIdentifier
+}
+
+type ResourceObjectIdentifier struct {
+  Type string `json:"type"`
+  ID   string `json:"id,omitempty"`
+}
+
 type ResourceObject struct {
-  Type       string          `json:"type"`
-  ID         string          `json:"id,omitempty"`
-  Attributes json.RawMessage `json:"attributes,omitempty"`
+  ResourceObjectIdentifier
+  Attributes    json.RawMessage          `json:"attributes"`
+  Relationships map[string]*Relationship `json:"relationships,omitempty"`
 }
 
 type ErrorObject struct {
@@ -43,14 +65,33 @@ type ErrorObjectSource struct {
   Pointer string `json:"pointer,omitempty"`
 }
 
-func(d *Data) MarshalJSON() ([]byte, error) {
+func(d *DocumentData) MarshalJSON() ([]byte, error) {
   if d.One != nil {
     return json.Marshal(d.One)
   }
   return json.Marshal(d.Many)
 }
 
-func(d *Data) UnmarshalJSON(data []byte) error {
+func(d *DocumentData) UnmarshalJSON(data []byte) error {
+  if bytes.HasPrefix(data, []byte("{")) {
+    return json.Unmarshal(data, &d.One)
+  }
+
+  if bytes.HasPrefix(data, []byte("[")) {
+    return json.Unmarshal(data, &d.Many)
+  }
+
+  return nil
+}
+
+func(d *RelationshipData) MarshalJSON() ([]byte, error) {
+  if d.One != nil {
+    return json.Marshal(d.One)
+  }
+  return json.Marshal(d.Many)
+}
+
+func(d *RelationshipData) UnmarshalJSON(data []byte) error {
   if bytes.HasPrefix(data, []byte("{")) {
     return json.Unmarshal(data, &d.One)
   }
@@ -68,9 +109,9 @@ func Marshal(payload interface{}) ([]byte, error) {
 
   switch reflect.TypeOf(payload).Kind() {
   case reflect.Struct:
-    doc, err = marshalStruct(payload)
+    doc, err = marshalDocumentStruct(payload)
   case reflect.Slice:
-    doc, err = marshalSlice(payload)
+    doc, err = marshalDocumentSlice(payload)
   }
   if err != nil {
     return nil, err
@@ -79,7 +120,7 @@ func Marshal(payload interface{}) ([]byte, error) {
   return json.Marshal(doc)
 }
 
-func marshalStruct(payload interface{}) (*Document, error) {
+func marshalDocumentStruct(payload interface{}) (*Document, error) {
   one := &ResourceObject{}
 
   err := marshalResourceObject(payload.(MarshalIdentifier), one)
@@ -88,7 +129,7 @@ func marshalStruct(payload interface{}) (*Document, error) {
   }
 
   doc := &Document{
-    Data: &Data{
+    Data: &DocumentData{
       One: one,
     },
   }
@@ -96,7 +137,7 @@ func marshalStruct(payload interface{}) (*Document, error) {
   return doc, nil
 }
 
-func marshalSlice(payload interface{}) (*Document, error) {
+func marshalDocumentSlice(payload interface{}) (*Document, error) {
   var doc *Document
 
   errorObjects, ok := payload.([]*ErrorObject)
@@ -121,13 +162,18 @@ func marshalSlice(payload interface{}) (*Document, error) {
     }
 
     doc = &Document{
-      Data: &Data{
+      Data: &DocumentData{
         Many: many,
       },
     }
   }
 
   return doc, nil
+}
+
+func marshalResourceObjectIdentifier(i MarshalIdentifier, r *ResourceObjectIdentifier) {
+  r.ID = i.GetID()
+  r.Type = i.GetType()
 }
 
 func marshalResourceObject(i MarshalIdentifier, r *ResourceObject) error {
@@ -140,7 +186,60 @@ func marshalResourceObject(i MarshalIdentifier, r *ResourceObject) error {
   r.Type = i.GetType()
   r.Attributes = attrs
 
+  if asserted, ok := i.(MarshalRelationships); ok {
+    r.Relationships = make(map[string]*Relationship)
+
+    for key, value := range asserted.GetRelationships() {
+      r.Relationships[key] = marshalRelationship(value)
+    }
+  }
+
   return nil
+}
+
+func marshalRelationship(payload interface{}) *Relationship {
+  var rel *Relationship
+
+  switch reflect.TypeOf(payload).Kind() {
+  case reflect.Struct:
+    rel = marshalRelationshipStruct(payload)
+  case reflect.Slice:
+    rel = marshalRelationshipSlice(payload)
+  }
+
+  return rel
+}
+
+func marshalRelationshipStruct(payload interface{}) *Relationship {
+  one := &ResourceObjectIdentifier{}
+
+  marshalResourceObjectIdentifier(payload.(MarshalIdentifier), one)
+
+  return &Relationship{
+    Data: &RelationshipData{
+      One: one,
+    },
+  }
+}
+
+func marshalRelationshipSlice(payload interface{}) *Relationship {
+  value := reflect.ValueOf(payload)
+
+  many := []*ResourceObjectIdentifier{}
+
+  for i := 0; i < value.Len(); i++ {
+    one := &ResourceObjectIdentifier{}
+
+    marshalResourceObjectIdentifier(value.Index(i).Interface().(MarshalIdentifier), one)
+
+    many = append(many, one)
+  }
+
+  return &Relationship{
+    Data: &RelationshipData{
+      Many: many,
+    },
+  }
 }
 
 func Unmarshal(data []byte, target interface{}) error {
@@ -209,17 +308,38 @@ func unmarshalMany(many []*ResourceObject, target interface{}) error {
   return nil
 }
 
-func unmarshalResourceObject(r *ResourceObject, i UnmarshalIdentifier) error {
+func unmarshalResourceObject(res *ResourceObject, ui UnmarshalIdentifier) error {
   var err error
 
-  err = json.Unmarshal(r.Attributes, i)
+  err = json.Unmarshal(res.Attributes, ui)
   if err != nil {
     return err
   }
 
-  err = i.SetID(r.ID)
+  err = ui.SetID(res.ID)
   if err != nil {
     return err
+  }
+
+  if ur, ok := ui.(UnmarshalRelationships); ok {
+    relationships := make(map[string]interface{})
+
+    for k, v := range res.Relationships {
+      one := v.Data.One
+      if one != nil {
+        relationships[k] = one
+      }
+
+      many := v.Data.Many
+      if many != nil {
+        relationships[k] = many
+      }
+    }
+
+    err = ur.SetRelationships(relationships)
+    if err != nil {
+      return err
+    }
   }
 
   return nil
