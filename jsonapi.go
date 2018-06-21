@@ -26,21 +26,21 @@ type UnmarshalRelationships interface {
   SetRelationships(map[string]interface{}) error
 }
 
-type Document struct {
-  Data   *DocumentData  `json:"data,omitempty"`
+type document struct {
+  Data   *documentData  `json:"data,omitempty"`
   Errors []*ErrorObject `json:"errors,omitempty"`
 }
 
-type DocumentData struct {
+type documentData struct {
   One    *ResourceObject
   Many []*ResourceObject
 }
 
-type Relationship struct {
-  Data *RelationshipData `json:"data"`
+type relationship struct {
+  Data *relationshipData `json:"data"`
 }
 
-type RelationshipData struct {
+type relationshipData struct {
   One    *ResourceObjectIdentifier
   Many []*ResourceObjectIdentifier
 }
@@ -53,7 +53,7 @@ type ResourceObjectIdentifier struct {
 type ResourceObject struct {
   ResourceObjectIdentifier
   Attributes    json.RawMessage          `json:"attributes"`
-  Relationships map[string]*Relationship `json:"relationships,omitempty"`
+  Relationships map[string]*relationship `json:"relationships,omitempty"`
 }
 
 type ErrorObject struct {
@@ -65,14 +65,14 @@ type ErrorObjectSource struct {
   Pointer string `json:"pointer,omitempty"`
 }
 
-func(d *DocumentData) MarshalJSON() ([]byte, error) {
+func(d *documentData) MarshalJSON() ([]byte, error) {
   if d.One != nil {
     return json.Marshal(d.One)
   }
   return json.Marshal(d.Many)
 }
 
-func(d *DocumentData) UnmarshalJSON(data []byte) error {
+func(d *documentData) UnmarshalJSON(data []byte) error {
   if bytes.HasPrefix(data, []byte("{")) {
     return json.Unmarshal(data, &d.One)
   }
@@ -84,14 +84,14 @@ func(d *DocumentData) UnmarshalJSON(data []byte) error {
   return nil
 }
 
-func(d *RelationshipData) MarshalJSON() ([]byte, error) {
+func(d *relationshipData) MarshalJSON() ([]byte, error) {
   if d.One != nil {
     return json.Marshal(d.One)
   }
   return json.Marshal(d.Many)
 }
 
-func(d *RelationshipData) UnmarshalJSON(data []byte) error {
+func(d *relationshipData) UnmarshalJSON(data []byte) error {
   if bytes.HasPrefix(data, []byte("{")) {
     return json.Unmarshal(data, &d.One)
   }
@@ -104,7 +104,7 @@ func(d *RelationshipData) UnmarshalJSON(data []byte) error {
 }
 
 func Marshal(payload interface{}) ([]byte, error) {
-  var doc *Document
+  var doc *document
   var err error
 
   switch reflect.TypeOf(payload).Kind() {
@@ -120,7 +120,7 @@ func Marshal(payload interface{}) ([]byte, error) {
   return json.Marshal(doc)
 }
 
-func marshalDocumentStruct(payload interface{}) (*Document, error) {
+func marshalDocumentStruct(payload interface{}) (*document, error) {
   one := &ResourceObject{}
 
   err := marshalResourceObject(payload.(MarshalIdentifier), one)
@@ -128,8 +128,8 @@ func marshalDocumentStruct(payload interface{}) (*Document, error) {
     return nil, err
   }
 
-  doc := &Document{
-    Data: &DocumentData{
+  doc := &document{
+    Data: &documentData{
       One: one,
     },
   }
@@ -137,12 +137,12 @@ func marshalDocumentStruct(payload interface{}) (*Document, error) {
   return doc, nil
 }
 
-func marshalDocumentSlice(payload interface{}) (*Document, error) {
-  var doc *Document
+func marshalDocumentSlice(payload interface{}) (*document, error) {
+  var doc *document
 
   errorObjects, ok := payload.([]*ErrorObject)
   if ok {
-    doc = &Document{
+    doc = &document{
       Errors: errorObjects,
     }
   } else {
@@ -161,8 +161,8 @@ func marshalDocumentSlice(payload interface{}) (*Document, error) {
       many = append(many, one)
     }
 
-    doc = &Document{
-      Data: &DocumentData{
+    doc = &document{
+      Data: &documentData{
         Many: many,
       },
     }
@@ -187,7 +187,7 @@ func marshalResourceObject(i MarshalIdentifier, r *ResourceObject) error {
   r.Attributes = attrs
 
   if asserted, ok := i.(MarshalRelationships); ok {
-    r.Relationships = make(map[string]*Relationship)
+    r.Relationships = make(map[string]*relationship)
 
     for key, value := range asserted.GetRelationships() {
       r.Relationships[key] = marshalRelationship(value)
@@ -197,8 +197,8 @@ func marshalResourceObject(i MarshalIdentifier, r *ResourceObject) error {
   return nil
 }
 
-func marshalRelationship(payload interface{}) *Relationship {
-  var rel *Relationship
+func marshalRelationship(payload interface{}) *relationship {
+  var rel *relationship
 
   switch reflect.TypeOf(payload).Kind() {
   case reflect.Struct:
@@ -210,19 +210,19 @@ func marshalRelationship(payload interface{}) *Relationship {
   return rel
 }
 
-func marshalRelationshipStruct(payload interface{}) *Relationship {
+func marshalRelationshipStruct(payload interface{}) *relationship {
   one := &ResourceObjectIdentifier{}
 
   marshalResourceObjectIdentifier(payload.(MarshalIdentifier), one)
 
-  return &Relationship{
-    Data: &RelationshipData{
+  return &relationship{
+    Data: &relationshipData{
       One: one,
     },
   }
 }
 
-func marshalRelationshipSlice(payload interface{}) *Relationship {
+func marshalRelationshipSlice(payload interface{}) *relationship {
   value := reflect.ValueOf(payload)
 
   many := []*ResourceObjectIdentifier{}
@@ -235,8 +235,8 @@ func marshalRelationshipSlice(payload interface{}) *Relationship {
     many = append(many, one)
   }
 
-  return &Relationship{
-    Data: &RelationshipData{
+  return &relationship{
+    Data: &relationshipData{
       Many: many,
     },
   }
@@ -245,7 +245,7 @@ func marshalRelationshipSlice(payload interface{}) *Relationship {
 func Unmarshal(data []byte, target interface{}) error {
   var err error
 
-  doc := &Document{}
+  doc := &document{}
 
   err = json.Unmarshal(data, doc)
   if err != nil {
