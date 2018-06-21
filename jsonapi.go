@@ -322,24 +322,33 @@ func unmarshalResourceObject(res *ResourceObject, ui UnmarshalIdentifier) error 
   }
 
   if ur, ok := ui.(UnmarshalRelationships); ok {
-    relationships := make(map[string]interface{})
-
-    for k, v := range res.Relationships {
-      one := v.Data.One
-      if one != nil {
-        relationships[k] = one
-      }
-
-      many := v.Data.Many
-      if many != nil {
-        relationships[k] = many
-      }
-    }
-
-    err = ur.SetRelationships(relationships)
+    err = unmarshalRelationships(res, ur)
     if err != nil {
       return err
     }
+  }
+
+  return nil
+}
+
+func unmarshalRelationships(res *ResourceObject, ur UnmarshalRelationships) error {
+  relationships := make(map[string]interface{})
+
+  for k, v := range res.Relationships {
+    one := v.Data.One
+    if one != nil {
+      relationships[k] = one
+    }
+
+    many := v.Data.Many
+    if many != nil {
+      relationships[k] = many
+    }
+  }
+
+  err := ur.SetRelationships(relationships)
+  if err != nil {
+    return err
   }
 
   return nil
