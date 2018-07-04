@@ -1,4 +1,4 @@
-module jsonapi-go
+module github.com/pieoneers/jsonapi-go
 
 require (
 	github.com/onsi/ginkgo v1.5.0
