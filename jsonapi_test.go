@@ -25,11 +25,11 @@ type Reader struct {
   Name string `json:"name"`
 }
 
-func (a Reader) GetID() string {
-  return a.ID
+func (r Reader) GetID() string {
+  return r.ID
 }
 
-func (a Reader) GetType() string {
+func (r Reader) GetType() string {
   return "people"
 }
 
@@ -53,18 +53,8 @@ func (b *Book) SetID(id string) error {
 }
 
 type BookWithAuthor struct {
-  ID     string `json:"-"`
-  Title  string `json:"title"`
-  Year   string `json:"year"`
+  Book
   Author Author `json:"-"`
-}
-
-func (b BookWithAuthor) GetID() string {
-  return b.ID
-}
-
-func (b BookWithAuthor) GetType() string {
-  return "books"
 }
 
 func (b BookWithAuthor) GetRelationships() map[string]interface{} {
@@ -73,41 +63,29 @@ func (b BookWithAuthor) GetRelationships() map[string]interface{} {
   }
 }
 
-func (b *BookWithAuthor) SetID(id string) error {
-  b.ID = id
-  return nil
-}
-
 func (b *BookWithAuthor) SetRelationships(relationships map[string]interface{}) error {
   resourceID := relationships["author"].(*ResourceObjectIdentifier)
   b.Author = Author{ ID: resourceID.ID }
   return nil
 }
 
+type BookWithAuthorIncluded struct {
+  BookWithAuthor
+}
+
+func (b BookWithAuthorIncluded) GetIncluded() []interface{} {
+  return []interface{}{ b.Author }
+}
+
 type BookWithReaders struct {
-  ID      string   `json:"-"`
-  Title   string   `json:"title"`
-  Year    string   `json:"year"`
+  Book
   Readers []Reader `json:"-"`
-}
-
-func (b BookWithReaders) GetID() string {
-  return b.ID
-}
-
-func (b BookWithReaders) GetType() string {
-  return "books"
 }
 
 func (b BookWithReaders) GetRelationships() map[string]interface{} {
   return map[string]interface{}{
     "readers": b.Readers,
   }
-}
-
-func (b *BookWithReaders) SetID(id string) error {
-  b.ID = id
-  return nil
 }
 
 func (b *BookWithReaders) SetRelationships(relationships map[string]interface{}) error {
@@ -118,6 +96,20 @@ func (b *BookWithReaders) SetRelationships(relationships map[string]interface{})
   }
 
   return nil
+}
+
+type BookWithReadersIncluded struct {
+  BookWithReaders
+}
+
+func (b BookWithReadersIncluded) GetIncluded() []interface{} {
+  var included []interface{}
+
+  for _, reader := range b.Readers {
+    included = append(included, reader)
+  }
+
+  return included
 }
 
 var _ = Describe("JSONAPI", func() {
@@ -151,9 +143,11 @@ var _ = Describe("JSONAPI", func() {
 
     It("marshals single resource object with one to one relationship", func() {
       book := BookWithAuthor{
-        ID:    "1",
-        Title: "An Introduction to Programming in Go",
-        Year:  "2012",
+        Book: Book{
+          ID:    "1",
+          Title: "An Introduction to Programming in Go",
+          Year:  "2012",
+        },
         Author: Author{
           ID:   "1",
           Name: "Caleb Doxsey",
@@ -180,6 +174,166 @@ var _ = Describe("JSONAPI", func() {
           }
         }
       `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals single resource object with one to one relationship included", func() {
+      book := BookWithAuthorIncluded{
+        BookWithAuthor: BookWithAuthor{
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
+          },
+          Author: Author{
+            ID:   "1",
+            Name: "Caleb Doxsey",
+          },
+        },
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            },
+            "relationships": {
+              "author": {
+                "data": { "type": "authors", "id": "1" }
+              }
+            }
+          },
+          "included": [
+            {
+              "type": "authors",
+              "id": "1",
+              "attributes": {
+                "name": "Caleb Doxsey"
+              }
+            }
+          ]
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals single resource object with one to many relationship", func() {
+      book := BookWithReaders{
+        Book: Book{
+          ID:    "1",
+          Title: "An Introduction to Programming in Go",
+          Year:  "2012",
+        },
+        Readers: []Reader{
+          {
+            ID:   "1",
+            Name: "Fedor Khardikov",
+          },
+          {
+            ID:   "2",
+            Name: "Andrew Manshin",
+          },
+        },
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            },
+            "relationships": {
+              "readers": {
+                "data": [
+                  { "type": "people", "id": "1" },
+                  { "type": "people", "id": "2" }
+                ]
+              }
+            }
+          }
+        }
+      `
+
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals single resource object with one to many relationship included", func() {
+      book := BookWithReadersIncluded{
+        BookWithReaders: BookWithReaders{
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
+          },
+          Readers: []Reader{
+            {
+              ID:   "1",
+              Name: "Fedor Khardikov",
+            },
+            {
+              ID:   "2",
+              Name: "Andrew Manshin",
+            },
+          },
+        },
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            },
+            "relationships": {
+              "readers": {
+                "data": [
+                  { "type": "people", "id": "1" },
+                  { "type": "people", "id": "2" }
+                ]
+              }
+            }
+          },
+          "included": [
+            {
+              "type": "people",
+              "id": "1",
+              "attributes": {
+                "name": "Fedor Khardikov"
+              }
+            },
+            {
+              "type": "people",
+              "id": "2",
+              "attributes": {
+                "name": "Andrew Manshin"
+              }
+            }
+          ]
+        }
+      `
+
       Ω(err).Should(BeNil())
       Ω(actual).Should(MatchJSON(expected))
     })
@@ -223,51 +377,6 @@ var _ = Describe("JSONAPI", func() {
           ]
         }
       `
-      Ω(err).Should(BeNil())
-      Ω(actual).Should(MatchJSON(expected))
-    })
-
-    It("marshals single resource object with one to many relationship", func() {
-      book := BookWithReaders{
-        ID:    "1",
-        Title: "An Introduction to Programming in Go",
-        Year:  "2012",
-        Readers: []Reader{
-          {
-            ID:   "1",
-            Name: "Fedor Khardikov",
-          },
-          {
-            ID:   "2",
-            Name: "Andrew Manshin",
-          },
-        },
-      }
-
-      bytes, err := Marshal(book)
-
-      actual   := string(bytes)
-      expected := `
-        {
-          "data": {
-            "type": "books",
-            "id": "1",
-            "attributes": {
-              "title": "An Introduction to Programming in Go",
-              "year": "2012"
-            },
-            "relationships": {
-              "readers": {
-                "data": [
-                  { "type": "people", "id": "1" },
-                  { "type": "people", "id": "2" }
-                ]
-              }
-            }
-          }
-        }
-      `
-
       Ω(err).Should(BeNil())
       Ω(actual).Should(MatchJSON(expected))
     })
@@ -319,8 +428,10 @@ var _ = Describe("JSONAPI", func() {
 
       actual   := BookWithAuthor{}
       expected := BookWithAuthor{
-        Title: "An Introduction to Programming in Go",
-        Year:  "2012",
+        Book: Book{
+          Title: "An Introduction to Programming in Go",
+          Year:  "2012",
+        },
         Author: Author{ ID: "1", },
       }
 
@@ -357,9 +468,11 @@ var _ = Describe("JSONAPI", func() {
       actual   := []*BookWithReaders{}
       expected := []*BookWithReaders{
         {
-          ID:    "1",
-          Title: "An Introduction to Programming in Go",
-          Year:  "2012",
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
+          },
           Readers: []Reader{
             { ID: "1" },
             { ID: "2" },
