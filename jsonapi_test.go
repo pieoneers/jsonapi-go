@@ -380,6 +380,21 @@ var _ = Describe("JSONAPI", func() {
       Ω(err).Should(BeNil())
       Ω(actual).Should(MatchJSON(expected))
     })
+
+    It("marshals empty resource collection into empty array", func() {
+      books := []Book{}
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": []
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
   })
 
   Describe("Unmarshal", func() {

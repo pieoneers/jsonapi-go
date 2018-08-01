@@ -152,10 +152,9 @@ func marshalDocumentSlice(payload interface{}) (*document, error) {
       Errors: errorObjects,
     }
   } else {
-    var (
-      many     []*ResourceObject
-      included []*ResourceObject
-    )
+    var included []*ResourceObject
+
+    many := []*ResourceObject{}
 
     value := reflect.ValueOf(payload)
 
@@ -249,9 +248,9 @@ func marshalRelationshipStruct(payload interface{}) *relationship {
 }
 
 func marshalRelationshipSlice(payload interface{}) *relationship {
-  value := reflect.ValueOf(payload)
-
   many := []*ResourceObjectIdentifier{}
+
+  value := reflect.ValueOf(payload)
 
   for i := 0; i < value.Len(); i++ {
     one := marshalResourceObjectIdentifier(value.Index(i).Interface().(MarshalResourceIdentifier))
