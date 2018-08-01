@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "jsonapi-go"
+	. "github.com/pieoneers/jsonapi-go"
 )
 
 type Author struct {
