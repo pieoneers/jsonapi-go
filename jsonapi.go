@@ -1,8 +1,10 @@
 package jsonapi
 
 import (
+  "sort"
   "bytes"
   "errors"
+  "strings"
   "reflect"
   "encoding/json"
 )
@@ -114,6 +116,20 @@ func Marshal(payload interface{}) ([]byte, error) {
     err error
   )
 
+  doc, err = marshalDocument(payload)
+  if err != nil {
+    return nil, err
+  }
+
+  return json.Marshal(doc)
+}
+
+func marshalDocument(payload interface{}) (*document, error) {
+  var (
+    doc *document
+    err error
+  )
+
   switch reflect.TypeOf(payload).Kind() {
   case reflect.Struct:
     doc, err = marshalDocumentStruct(payload)
@@ -125,20 +141,33 @@ func Marshal(payload interface{}) ([]byte, error) {
     return nil, err
   }
 
-  return json.Marshal(doc)
+  sort.Slice(doc.Included, func(i, j int) bool {
+    return strings.Compare(doc.Included[i].Type, doc.Included[j].Type) == -1
+  })
+
+  sort.Slice(doc.Included, func(i, j int) bool {
+    return strings.Compare(doc.Included[i].ID, doc.Included[j].ID) == -1
+  })
+
+  return doc, nil
 }
 
 func marshalDocumentStruct(payload interface{}) (*document, error) {
+  doc := &document{
+    Data: &documentData{},
+  }
+
   one, included, err := marshalResourceObject(payload.(MarshalResourceIdentifier))
   if err != nil {
     return nil, err
   }
 
-  doc := &document{
-    Data: &documentData{
-      One: &one,
-    },
-    Included: included,
+  doc.Data.One = &one
+
+  for _, inc := range included {
+    for _, one := range inc {
+      doc.Included = append(doc.Included, one)
+    }
   }
 
   return doc, nil
@@ -152,9 +181,13 @@ func marshalDocumentSlice(payload interface{}) (*document, error) {
       Errors: errorObjects,
     }
   } else {
-    var included []*ResourceObject
+    doc = &document{
+      Data: &documentData{
+        Many: []*ResourceObject{},
+      },
+    }
 
-    many := []*ResourceObject{}
+    included := map[string]map[string]*ResourceObject{}
 
     value := reflect.ValueOf(payload)
 
@@ -164,18 +197,25 @@ func marshalDocumentSlice(payload interface{}) (*document, error) {
         return nil, err
       }
 
-      many = append(many, &one)
+      doc.Data.Many = append(doc.Data.Many, &one)
 
-      for _, i := range inc {
-        included = append(included, i)
+      for typ, value := range inc {
+        if _, ok := included[typ]; !ok {
+          included[typ] = make(map[string]*ResourceObject)
+        }
+
+        for id, one := range value {
+          if _, ok := included[typ][id]; !ok {
+            included[typ][id] = one
+          }
+        }
       }
     }
 
-    doc = &document{
-      Data: &documentData{
-        Many: many,
-      },
-      Included: included,
+    for _, inc := range included {
+      for _, one := range inc {
+        doc.Included = append(doc.Included, one)
+      }
     }
   }
 
@@ -186,8 +226,8 @@ func marshalResourceObjectIdentifier(mri MarshalResourceIdentifier) ResourceObje
   return ResourceObjectIdentifier{ ID: mri.GetID(), Type: mri.GetType() }
 }
 
-func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, []*ResourceObject, error) {
-  var included []*ResourceObject
+func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, map[string]map[string]*ResourceObject, error) {
+  var included map[string]map[string]*ResourceObject
 
   one := ResourceObject{
     ResourceObjectIdentifier: marshalResourceObjectIdentifier(mri),
@@ -225,48 +265,50 @@ func marshalRelationships(mr MarshalRelationships) map[string]*relationship {
 }
 
 func marshalRelationship(payload interface{}) *relationship {
-  var rel *relationship
+  var relationship *relationship
 
   switch reflect.TypeOf(payload).Kind() {
   case reflect.Struct:
-    rel = marshalRelationshipStruct(payload)
+    relationship = marshalRelationshipStruct(payload)
   case reflect.Slice:
-    rel = marshalRelationshipSlice(payload)
+    relationship = marshalRelationshipSlice(payload)
   }
 
-  return rel
+  return relationship
 }
 
 func marshalRelationshipStruct(payload interface{}) *relationship {
-  one := marshalResourceObjectIdentifier(payload.(MarshalResourceIdentifier))
-
-  return &relationship{
-    Data: &relationshipData{
-      One: &one,
-    },
+  relationship := &relationship{
+    Data: &relationshipData{},
   }
+
+  one := marshalResourceObjectIdentifier(payload.(MarshalResourceIdentifier))
+  relationship.Data.One = &one
+
+  return relationship
 }
 
 func marshalRelationshipSlice(payload interface{}) *relationship {
-  many := []*ResourceObjectIdentifier{}
+  relationship := &relationship{
+    Data: &relationshipData{},
+  }
 
   value := reflect.ValueOf(payload)
 
   for i := 0; i < value.Len(); i++ {
     one := marshalResourceObjectIdentifier(value.Index(i).Interface().(MarshalResourceIdentifier))
-
-    many = append(many, &one)
+    relationship.Data.Many = append(relationship.Data.Many, &one)
   }
 
-  return &relationship{
-    Data: &relationshipData{
-      Many: many,
-    },
-  }
+  sort.Slice(relationship.Data.Many, func(i, j int) bool {
+    return strings.Compare(relationship.Data.Many[i].ID, relationship.Data.Many[j].ID) == -1
+  })
+
+  return relationship
 }
 
-func marshalIncluded(mi MarshalIncluded) ([]*ResourceObject, error) {
-  var included []*ResourceObject
+func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject, error) {
+  included := make(map[string]map[string]*ResourceObject)
 
   for _, value := range mi.GetIncluded() {
     inc, _, err := marshalResourceObject(value.(MarshalResourceIdentifier))
@@ -274,7 +316,15 @@ func marshalIncluded(mi MarshalIncluded) ([]*ResourceObject, error) {
       return included, err
     }
 
-    included = append(included, &inc)
+    typ, id := inc.Type, inc.ID
+
+    if _, ok := included[typ]; !ok {
+      included[typ] = make(map[string]*ResourceObject)
+    }
+
+    if _, ok := included[typ][id]; !ok {
+      included[typ][id] = &inc
+    }
   }
 
   return included, nil
@@ -346,21 +396,21 @@ func unmarshalMany(many []*ResourceObject, target interface{}) error {
   return nil
 }
 
-func unmarshalResourceObject(res *ResourceObject, ui UnmarshalResourceIdentifier) error {
+func unmarshalResourceObject(ro *ResourceObject, ui UnmarshalResourceIdentifier) error {
   var err error
 
-  err = json.Unmarshal(res.Attributes, ui)
+  err = json.Unmarshal(ro.Attributes, ui)
   if err != nil {
     return err
   }
 
-  err = ui.SetID(res.ID)
+  err = ui.SetID(ro.ID)
   if err != nil {
     return err
   }
 
   if ur, ok := ui.(UnmarshalRelationships); ok {
-    err = unmarshalRelationships(res, ur)
+    err = unmarshalRelationships(ro, ur)
     if err != nil {
       return err
     }
@@ -369,10 +419,10 @@ func unmarshalResourceObject(res *ResourceObject, ui UnmarshalResourceIdentifier
   return nil
 }
 
-func unmarshalRelationships(res *ResourceObject, ur UnmarshalRelationships) error {
+func unmarshalRelationships(ro *ResourceObject, ur UnmarshalRelationships) error {
   relationships := map[string]interface{}{}
 
-  for k, v := range res.Relationships {
+  for k, v := range ro.Relationships {
     one := v.Data.One
     if one != nil {
       relationships[k] = one

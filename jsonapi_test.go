@@ -381,7 +381,345 @@ var _ = Describe("JSONAPI", func() {
       Ω(actual).Should(MatchJSON(expected))
     })
 
-    It("marshals empty resource collection into empty array", func() {
+    It("marshals multiple resource objects with one to one relationships", func() {
+      books := []BookWithAuthor{
+        {
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
+          },
+          Author: Author{
+            ID:   "1",
+            Name: "Caleb Doxsey",
+          },
+        },
+        {
+          Book: Book{
+            ID:    "2",
+            Title: "Introducing Go",
+            Year:  "2016",
+          },
+          Author: Author{
+            ID:   "1",
+            Name: "Caleb Doxsey",
+          },
+        },
+      }
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": [
+            {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              },
+              "relationships": {
+                "author": {
+                  "data": { "type": "authors", "id": "1" }
+                }
+              }
+            },
+            {
+              "type": "books",
+              "id": "2",
+              "attributes": {
+                "title": "Introducing Go",
+                "year": "2016"
+              },
+              "relationships": {
+                "author": {
+                  "data": { "type": "authors", "id": "1" }
+                }
+              }
+            }
+          ]
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals multiple resource objects with one to one relationships included", func() {
+      books := []BookWithAuthorIncluded{
+        {
+          BookWithAuthor: BookWithAuthor{
+            Book: Book{
+              ID:    "1",
+              Title: "An Introduction to Programming in Go",
+              Year:  "2012",
+            },
+            Author: Author{
+              ID:   "1",
+              Name: "Caleb Doxsey",
+            },
+          },
+        },
+        {
+          BookWithAuthor: BookWithAuthor{
+            Book: Book{
+              ID:    "2",
+              Title: "Introducing Go",
+              Year:  "2016",
+            },
+            Author: Author{
+              ID:   "1",
+              Name: "Caleb Doxsey",
+            },
+          },
+        },
+      }
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": [
+            {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              },
+              "relationships": {
+                "author": {
+                  "data": { "type": "authors", "id": "1" }
+                }
+              }
+            },
+            {
+              "type": "books",
+              "id": "2",
+              "attributes": {
+                "title": "Introducing Go",
+                "year": "2016"
+              },
+              "relationships": {
+                "author": {
+                  "data": { "type": "authors", "id": "1" }
+                }
+              }
+            }
+          ],
+          "included": [
+            {
+              "type": "authors",
+              "id": "1",
+              "attributes": {
+                "name": "Caleb Doxsey"
+              }
+            }
+          ]
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals multiple resource objects with one to many relationships", func() {
+      books := []BookWithReaders{
+        {
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
+          },
+          Readers: []Reader{
+            {
+              ID:   "1",
+              Name: "Fedor Khardikov",
+            },
+            {
+              ID:   "2",
+              Name: "Andrew Manshin",
+            },
+          },
+        },
+        {
+          Book: Book{
+            ID:    "2",
+            Title: "Introducing Go",
+            Year:  "2016",
+          },
+          Readers: []Reader{
+            {
+              ID:   "2",
+              Name: "Andrew Manshin",
+            },
+            {
+              ID:   "1",
+              Name: "Fedor Khardikov",
+            },
+          },
+        },
+      }
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": [
+            {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              },
+              "relationships": {
+                "readers": {
+                  "data": [
+                    { "type": "people", "id": "1" },
+                    { "type": "people", "id": "2" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "books",
+              "id": "2",
+              "attributes": {
+                "title": "Introducing Go",
+                "year": "2016"
+              },
+              "relationships": {
+                "readers": {
+                  "data": [
+                    { "type": "people", "id": "1" },
+                    { "type": "people", "id": "2" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      `
+
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals multiple resource objects with one to many relationships included", func() {
+      books := []BookWithReadersIncluded{
+        {
+          BookWithReaders {
+            Book: Book{
+              ID:    "1",
+              Title: "An Introduction to Programming in Go",
+              Year:  "2012",
+            },
+            Readers: []Reader{
+              {
+                ID:   "1",
+                Name: "Fedor Khardikov",
+              },
+              {
+                ID:   "2",
+                Name: "Andrew Manshin",
+              },
+            },
+          },
+        },
+        {
+          BookWithReaders {
+            Book: Book{
+              ID:    "2",
+              Title: "Introducing Go",
+              Year:  "2016",
+            },
+            Readers: []Reader{
+              {
+                ID:   "3",
+                Name: "Shane McCallum",
+              },
+              {
+                ID:   "1",
+                Name: "Fedor Khardikov",
+              },
+            },
+          },
+        },
+      }
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": [
+            {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              },
+              "relationships": {
+                "readers": {
+                  "data": [
+                    { "type": "people", "id": "1" },
+                    { "type": "people", "id": "2" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "books",
+              "id": "2",
+              "attributes": {
+                "title": "Introducing Go",
+                "year": "2016"
+              },
+              "relationships": {
+                "readers": {
+                  "data": [
+                    { "type": "people", "id": "1" },
+                    { "type": "people", "id": "3" }
+                  ]
+                }
+              }
+            }
+          ],
+          "included": [
+            {
+              "type": "people",
+              "id": "1",
+              "attributes": {
+                "name": "Fedor Khardikov"
+              }
+            },
+            {
+              "type": "people",
+              "id": "2",
+              "attributes": {
+                "name": "Andrew Manshin"
+              }
+            },
+            {
+              "type": "people",
+              "id": "3",
+              "attributes": {
+                "name": "Shane McCallum"
+              }
+            }
+          ]
+        }
+      `
+
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals empty collection into empty array", func() {
       books := []Book{}
 
       bytes, err := Marshal(books)
@@ -500,7 +838,6 @@ var _ = Describe("JSONAPI", func() {
       Ω(err).Should(BeNil())
       Ω(actual).Should(Equal(expected))
     })
-
 
     It("unmarshals multiple resource objects", func() {
       payload := []byte(`
