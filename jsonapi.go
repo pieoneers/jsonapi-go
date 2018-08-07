@@ -57,6 +57,14 @@ type ResourceObjectIdentifier struct {
   ID   string `json:"id,omitempty"`
 }
 
+func(roi ResourceObjectIdentifier) GetID() string {
+  return roi.ID
+}
+
+func(roi ResourceObjectIdentifier) GetType() string {
+  return roi.Type
+}
+
 type ResourceObject struct {
   ResourceObjectIdentifier
   Attributes    json.RawMessage          `json:"attributes"`
