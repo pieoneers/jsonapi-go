@@ -72,8 +72,8 @@ type ResourceObject struct {
 }
 
 type ErrorObject struct {
-  Title  string             `json:"title,omitempty"`
-  Source *ErrorObjectSource `json:"source,omitempty"`
+  Title  string            `json:"title,omitempty"`
+  Source ErrorObjectSource `json:"source,omitempty"`
 }
 
 type ErrorObjectSource struct {
@@ -87,13 +87,13 @@ func(d *documentData) MarshalJSON() ([]byte, error) {
   return json.Marshal(d.Many)
 }
 
-func(d *documentData) UnmarshalJSON(data []byte) error {
-  if bytes.HasPrefix(data, []byte("{")) {
-    return json.Unmarshal(data, &d.One)
+func(d *documentData) UnmarshalJSON(payload []byte) error {
+  if bytes.HasPrefix(payload, []byte("{")) {
+    return json.Unmarshal(payload, &d.One)
   }
 
-  if bytes.HasPrefix(data, []byte("[")) {
-    return json.Unmarshal(data, &d.Many)
+  if bytes.HasPrefix(payload, []byte("[")) {
+    return json.Unmarshal(payload, &d.Many)
   }
 
   return nil
@@ -106,13 +106,13 @@ func(d *relationshipData) MarshalJSON() ([]byte, error) {
   return json.Marshal(d.Many)
 }
 
-func(d *relationshipData) UnmarshalJSON(data []byte) error {
-  if bytes.HasPrefix(data, []byte("{")) {
-    return json.Unmarshal(data, &d.One)
+func(d *relationshipData) UnmarshalJSON(payload []byte) error {
+  if bytes.HasPrefix(payload, []byte("{")) {
+    return json.Unmarshal(payload, &d.One)
   }
 
-  if bytes.HasPrefix(data, []byte("[")) {
-    return json.Unmarshal(data, &d.Many)
+  if bytes.HasPrefix(payload, []byte("[")) {
+    return json.Unmarshal(payload, &d.Many)
   }
 
   return nil
@@ -348,21 +348,27 @@ func Unmarshal(data []byte, target interface{}) error {
     return err
   }
 
-  if doc.Data == nil {
-    return errors.New("The root object must have the data key")
-  }
+  if doc.Data != nil {
+    one := doc.Data.One
+    if one != nil {
+      err = unmarshalOne(one, target)
+      if err != nil {
+        return err
+      }
+    }
 
-  one := doc.Data.One
-  if one != nil {
-    err = unmarshalOne(one, target)
-    if err != nil {
-      return err
+    many := doc.Data.Many
+    if many != nil {
+      err = unmarshalMany(many, target)
+      if err != nil {
+        return err
+      }
     }
   }
 
-  many := doc.Data.Many
-  if many != nil {
-    err = unmarshalMany(many, target)
+  errs := doc.Errors
+  if errs != nil {
+    err = unmarshalErrors(errs, target)
     if err != nil {
       return err
     }
@@ -446,6 +452,17 @@ func unmarshalRelationships(ro *ResourceObject, ur UnmarshalRelationships) error
   if err != nil {
     return err
   }
+
+  return nil
+}
+
+func unmarshalErrors(docErrs []*ErrorObject, target interface{}) error {
+  targetErrs, ok := target.(*[]*ErrorObject)
+  if !ok {
+    return errors.New("Target must have *[]*ErrorObject type")
+  }
+
+  *targetErrs = docErrs
 
   return nil
 }

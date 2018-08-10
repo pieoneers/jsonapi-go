@@ -881,5 +881,47 @@ var _ = Describe("JSONAPI", func() {
       Ω(err).Should(BeNil())
       Ω(actual).Should(Equal(expected))
     })
+
+    It("unmarshals error objects", func() {
+      payload := []byte(`
+        {
+          "errors": [
+            {
+              "title": "is required",
+              "source": {
+                "pointer": "/data/attributes/title"
+              }
+            },
+            {
+              "title": "is required",
+              "source": {
+                "pointer": "/data/attributes/year"
+              }
+            }
+          ]
+        }
+      `)
+
+      actual   := []*ErrorObject{}
+      expected := []*ErrorObject{
+        {
+          Title: "is required",
+          Source: ErrorObjectSource{
+            Pointer: "/data/attributes/title",
+          },
+        },
+        {
+          Title: "is required",
+          Source: ErrorObjectSource{
+            Pointer: "/data/attributes/year",
+          },
+        },
+      }
+
+      err := Unmarshal(payload, &actual)
+
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(Equal(expected))
+    })
   })
 })
