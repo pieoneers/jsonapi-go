@@ -3,7 +3,6 @@ package jsonapi
 import (
   "sort"
   "bytes"
-  "errors"
   "strings"
   "reflect"
   "encoding/json"
@@ -32,7 +31,7 @@ type MarshalIncluded interface {
   GetIncluded() []interface{}
 }
 
-type document struct {
+type Document struct {
   Data     *documentData     `json:"data,omitempty"`
   Errors   []*ErrorObject    `json:"errors,omitempty"`
   Included []*ResourceObject `json:"included,omitempty"`
@@ -120,7 +119,7 @@ func(d *relationshipData) UnmarshalJSON(payload []byte) error {
 
 func Marshal(payload interface{}) ([]byte, error) {
   var (
-    doc *document
+    doc *Document
     err error
   )
 
@@ -132,9 +131,9 @@ func Marshal(payload interface{}) ([]byte, error) {
   return json.Marshal(doc)
 }
 
-func marshalDocument(payload interface{}) (*document, error) {
+func marshalDocument(payload interface{}) (*Document, error) {
   var (
-    doc *document
+    doc *Document
     err error
   )
 
@@ -160,8 +159,8 @@ func marshalDocument(payload interface{}) (*document, error) {
   return doc, nil
 }
 
-func marshalDocumentStruct(payload interface{}) (*document, error) {
-  doc := &document{
+func marshalDocumentStruct(payload interface{}) (*Document, error) {
+  doc := &Document{
     Data: &documentData{},
   }
 
@@ -181,15 +180,15 @@ func marshalDocumentStruct(payload interface{}) (*document, error) {
   return doc, nil
 }
 
-func marshalDocumentSlice(payload interface{}) (*document, error) {
-  var doc *document
+func marshalDocumentSlice(payload interface{}) (*Document, error) {
+  var doc *Document
 
   if errorObjects, ok := payload.([]*ErrorObject); ok {
-    doc = &document{
+    doc = &Document{
       Errors: errorObjects,
     }
   } else {
-    doc = &document{
+    doc = &Document{
       Data: &documentData{
         Many: []*ResourceObject{},
       },
@@ -338,43 +337,32 @@ func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject,
   return included, nil
 }
 
-func Unmarshal(data []byte, target interface{}) error {
+func Unmarshal(data []byte, target interface{}) (*Document, error) {
   var err error
 
-  doc := &document{}
+  doc := &Document{}
 
   err = json.Unmarshal(data, doc)
   if err != nil {
-    return err
-  }
-
-  if doc.Data != nil {
-    one := doc.Data.One
-    if one != nil {
-      err = unmarshalOne(one, target)
-      if err != nil {
-        return err
-      }
-    }
-
-    many := doc.Data.Many
-    if many != nil {
-      err = unmarshalMany(many, target)
-      if err != nil {
-        return err
-      }
-    }
+    return doc, err
   }
 
   errs := doc.Errors
   if errs != nil {
-    err = unmarshalErrors(errs, target)
-    if err != nil {
-      return err
-    }
+    return doc, err
   }
 
-  return nil
+  one := doc.Data.One
+  if one != nil {
+    err = unmarshalOne(one, target)
+  }
+
+  many := doc.Data.Many
+  if many != nil {
+    err = unmarshalMany(many, target)
+  }
+
+  return doc, err
 }
 
 func unmarshalOne(one *ResourceObject, target interface{}) error {
@@ -452,17 +440,6 @@ func unmarshalRelationships(ro *ResourceObject, ur UnmarshalRelationships) error
   if err != nil {
     return err
   }
-
-  return nil
-}
-
-func unmarshalErrors(docErrs []*ErrorObject, target interface{}) error {
-  targetErrs, ok := target.(*[]*ErrorObject)
-  if !ok {
-    return errors.New("Target must have *[]*ErrorObject type")
-  }
-
-  *targetErrs = docErrs
 
   return nil
 }

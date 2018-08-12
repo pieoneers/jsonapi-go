@@ -755,7 +755,7 @@ var _ = Describe("JSONAPI", func() {
         Year:  "2012",
       }
 
-      err := Unmarshal(payload, &actual)
+      _, err := Unmarshal(payload, &actual)
 
       Ω(err).Should(BeNil())
       Ω(actual).Should(Equal(expected))
@@ -788,7 +788,7 @@ var _ = Describe("JSONAPI", func() {
         Author: Author{ ID: "1", },
       }
 
-      err := Unmarshal(payload, &actual)
+      _, err := Unmarshal(payload, &actual)
 
       Ω(err).Should(BeNil())
       Ω(actual).Should(Equal(expected))
@@ -833,7 +833,7 @@ var _ = Describe("JSONAPI", func() {
         },
       }
 
-      err := Unmarshal(payload, &actual)
+      _, err := Unmarshal(payload, &actual)
 
       Ω(err).Should(BeNil())
       Ω(actual).Should(Equal(expected))
@@ -876,7 +876,7 @@ var _ = Describe("JSONAPI", func() {
         },
       }
 
-      err := Unmarshal(payload, &actual)
+      _, err := Unmarshal(payload, &actual)
 
       Ω(err).Should(BeNil())
       Ω(actual).Should(Equal(expected))
@@ -902,7 +902,9 @@ var _ = Describe("JSONAPI", func() {
         }
       `)
 
-      actual   := []*ErrorObject{}
+      doc, err := Unmarshal(payload, &Book{})
+
+      actual := doc.Errors
       expected := []*ErrorObject{
         {
           Title: "is required",
@@ -918,9 +920,7 @@ var _ = Describe("JSONAPI", func() {
         },
       }
 
-      err := Unmarshal(payload, &actual)
-
-      Ω(err).Should(BeNil())
+      Ω(err).ShouldNot(HaveOccurred())
       Ω(actual).Should(Equal(expected))
     })
   })
