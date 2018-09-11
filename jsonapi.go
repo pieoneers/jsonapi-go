@@ -164,16 +164,23 @@ func marshalDocumentStruct(payload interface{}) (*Document, error) {
     Data: &documentData{},
   }
 
-  one, included, err := marshalResourceObject(payload.(MarshalResourceIdentifier))
+  one, err := marshalResourceObject(payload.(MarshalResourceIdentifier))
   if err != nil {
     return nil, err
   }
 
   doc.Data.One = &one
 
-  for _, inc := range included {
-    for _, one := range inc {
-      doc.Included = append(doc.Included, one)
+  if mi, ok := payload.(MarshalIncluded); ok {
+    included, err := marshalIncluded(mi)
+    if err != nil {
+      return nil, err
+    }
+
+    for _, inc := range included {
+      for _, one := range inc {
+        doc.Included = append(doc.Included, one)
+      }
     }
   }
 
@@ -194,17 +201,20 @@ func marshalDocumentSlice(payload interface{}) (*Document, error) {
       },
     }
 
-    included := map[string]map[string]*ResourceObject{}
+    many, err := marshalResourceObjects(payload)
+    if err != nil {
+      return nil, err
+    }
 
-    value := reflect.ValueOf(payload)
+    doc.Data.Many = many
 
-    for i := 0; i < value.Len(); i++ {
-      one, inc, err := marshalResourceObject(value.Index(i).Interface().(MarshalResourceIdentifier))
+    included := make(map[string]map[string]*ResourceObject)
+
+    if mi, ok := payload.(MarshalIncluded); ok {
+      inc, err := marshalIncluded(mi)
       if err != nil {
         return nil, err
       }
-
-      doc.Data.Many = append(doc.Data.Many, &one)
 
       for typ, value := range inc {
         if _, ok := included[typ]; !ok {
@@ -214,6 +224,29 @@ func marshalDocumentSlice(payload interface{}) (*Document, error) {
         for id, one := range value {
           if _, ok := included[typ][id]; !ok {
             included[typ][id] = one
+          }
+        }
+      }
+    } else {
+      value := reflect.ValueOf(payload)
+
+      for i := 0; i < value.Len(); i++ {
+        if mi, ok := value.Index(i).Interface().(MarshalIncluded); ok {
+          inc, err := marshalIncluded(mi)
+          if err != nil {
+            return nil, err
+          }
+
+          for typ, value := range inc {
+            if _, ok := included[typ]; !ok {
+              included[typ] = make(map[string]*ResourceObject)
+            }
+
+            for id, one := range value {
+              if _, ok := included[typ][id]; !ok {
+                included[typ][id] = one
+              }
+            }
           }
         }
       }
@@ -233,32 +266,40 @@ func marshalResourceObjectIdentifier(mri MarshalResourceIdentifier) ResourceObje
   return ResourceObjectIdentifier{ ID: mri.GetID(), Type: mri.GetType() }
 }
 
-func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, map[string]map[string]*ResourceObject, error) {
-  var included map[string]map[string]*ResourceObject
-
+func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, error) {
   one := ResourceObject{
     ResourceObjectIdentifier: marshalResourceObjectIdentifier(mri),
   }
 
   attributes, err := json.Marshal(mri)
   if err != nil {
-    return one, included, err
+    return one, err
   }
 
   one.Attributes = attributes
 
   if mr, ok := mri.(MarshalRelationships); ok {
     one.Relationships = marshalRelationships(mr)
-
-    if mi, ok := mri.(MarshalIncluded); ok {
-      included, err = marshalIncluded(mi)
-      if err != nil {
-        return one, included, err
-      }
-    }
   }
 
-  return one, included, nil
+  return one, nil
+}
+
+func marshalResourceObjects(payload interface{}) ([]*ResourceObject, error) {
+  many := []*ResourceObject{}
+
+  value := reflect.ValueOf(payload)
+
+  for i := 0; i < value.Len(); i++ {
+    one, err := marshalResourceObject(value.Index(i).Interface().(MarshalResourceIdentifier))
+    if err != nil {
+      return many, err
+    }
+
+    many = append(many, &one)
+  }
+
+  return many, nil
 }
 
 func marshalRelationships(mr MarshalRelationships) map[string]*relationship {
@@ -318,19 +359,19 @@ func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject,
   included := make(map[string]map[string]*ResourceObject)
 
   for _, value := range mi.GetIncluded() {
-    inc, _, err := marshalResourceObject(value.(MarshalResourceIdentifier))
+    ro, err := marshalResourceObject(value.(MarshalResourceIdentifier))
     if err != nil {
       return included, err
     }
 
-    typ, id := inc.Type, inc.ID
+    typ, id := ro.Type, ro.ID
 
     if _, ok := included[typ]; !ok {
       included[typ] = make(map[string]*ResourceObject)
     }
 
     if _, ok := included[typ][id]; !ok {
-      included[typ][id] = &inc
+      included[typ][id] = &ro
     }
   }
 
