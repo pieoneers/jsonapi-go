@@ -80,10 +80,21 @@ type ErrorObjectSource struct {
 }
 
 func(d *documentData) MarshalJSON() ([]byte, error) {
+  var err error
+
+  buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+
   if d.One != nil {
-    return json.Marshal(d.One)
+    err = enc.Encode(d.One)
+
+    return buf.Bytes(), err
   }
-  return json.Marshal(d.Many)
+
+  err = enc.Encode(d.Many)
+
+  return buf.Bytes(), err
 }
 
 func(d *documentData) UnmarshalJSON(payload []byte) error {
@@ -128,7 +139,13 @@ func Marshal(payload interface{}) ([]byte, error) {
     return nil, err
   }
 
-  return json.Marshal(doc)
+  buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+
+  err = enc.Encode(doc)
+
+  return buf.Bytes(), err
 }
 
 func marshalDocument(payload interface{}) (*Document, error) {
@@ -271,12 +288,16 @@ func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, error
     ResourceObjectIdentifier: marshalResourceObjectIdentifier(mri),
   }
 
-  attributes, err := json.Marshal(mri)
+  buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+
+  err := enc.Encode(mri)
   if err != nil {
     return one, err
   }
 
-  one.Attributes = attributes
+  one.Attributes = buf.Bytes()
 
   if mr, ok := mri.(MarshalRelationships); ok {
     one.Relationships = marshalRelationships(mr)
