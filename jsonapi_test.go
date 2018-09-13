@@ -167,6 +167,32 @@ var _ = Describe("JSONAPI", func() {
       Ω(actual).Should(MatchJSON(expected))
     })
 
+    It("marshals single resource object given as pointer", func() {
+      book := &Book{
+        ID:    "1",
+        Title: "An Introduction to Programming in Go",
+        Year:  "2012",
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            }
+          }
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
     It("marshals single resource object with one to one relationship", func() {
       book := BookWithAuthor{
         Book: Book{
@@ -366,6 +392,49 @@ var _ = Describe("JSONAPI", func() {
 
     It("marshals multiple resource objects", func() {
       books := []Book{
+        {
+          ID:    "1",
+          Title: "An Introduction to Programming in Go",
+          Year:  "2012",
+        },
+        {
+          ID:    "2",
+          Title: "Introducing Go",
+          Year:  "2016",
+        },
+      }
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": [
+            {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              }
+            },
+            {
+              "type": "books",
+              "id": "2",
+              "attributes": {
+                "title": "Introducing Go",
+                "year": "2016"
+              }
+            }
+          ]
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals multiple resource objects given as pointers", func() {
+      books := &[]*Book{
         {
           ID:    "1",
           Title: "An Introduction to Programming in Go",

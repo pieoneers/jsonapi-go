@@ -134,7 +134,15 @@ func Marshal(payload interface{}) ([]byte, error) {
     err error
   )
 
-  doc, err = marshalDocument(payload)
+  val := reflect.ValueOf(payload)
+  i := val.Interface()
+
+  if val.Kind() == reflect.Ptr {
+    val = val.Elem()
+    i = val.Interface()
+  }
+
+  doc, err = marshalDocument(i)
   if err != nil {
     return nil, err
   }
