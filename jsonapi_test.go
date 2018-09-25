@@ -52,6 +52,35 @@ func(b *Book) SetID(id string) error {
   return nil
 }
 
+type BookWithMeta struct {
+	Book
+}
+
+type BooksWithMeta []BookWithMeta
+
+type BookMeta struct {
+	NumberOfAuthors int `json:"number_of_authors"`
+	NumberOfReaders int `json:"number_of_readers"`
+	TotalRead 	 		int `json:"total_read"`
+}
+
+func(b BookWithMeta) GetMetaInformation() interface{} {
+	return BookMeta{
+		NumberOfAuthors: 1,
+		NumberOfReaders: 2,
+		TotalRead: 	 		 3,
+	}
+}
+
+func(b BooksWithMeta) GetMetaInformation() interface{} {
+	return BookMeta{
+		NumberOfAuthors: 2,
+		NumberOfReaders: 3,
+		TotalRead: 	 		 4,
+	}
+}
+
+
 type BookWithAuthor struct {
   Book
   Author Author `json:"-"`
@@ -187,6 +216,39 @@ var _ = Describe("JSONAPI", func() {
               "year": "2012"
             }
           }
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+		It("marshals single resource object with meta information", func() {
+      book := BookWithMeta{
+				Book: Book{
+					ID:    "1",
+					Title: "An Introduction to Programming in Go",
+					Year:  "2012",
+				},
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            }
+          },
+					"meta": {
+						"number_of_authors": 1,
+						"number_of_readers": 2,
+						"total_read": 3
+					}
         }
       `
       Ω(err).Should(BeNil())
@@ -475,6 +537,59 @@ var _ = Describe("JSONAPI", func() {
       Ω(err).Should(BeNil())
       Ω(actual).Should(MatchJSON(expected))
     })
+
+		It("marshals multiple resource objects with meta", func() {
+      books := BooksWithMeta{
+        {
+					Book: Book{
+						ID:    "1",
+						Title: "An Introduction to Programming in Go",
+						Year:  "2012",
+					},
+				},
+				{
+					Book: Book{
+					  ID:    "2",
+	          Title: "Introducing Go",
+	          Year:  "2016",
+					},
+        },
+      }
+
+      bytes, err := Marshal(books)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": [
+            {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              }
+            },
+            {
+              "type": "books",
+              "id": "2",
+              "attributes": {
+                "title": "Introducing Go",
+                "year": "2016"
+              }
+            }
+          ],
+					"meta": {
+						"number_of_authors": 2,
+						"number_of_readers": 3,
+						"total_read": 4
+					}
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
 
     It("marshals multiple resource objects with one to one relationships", func() {
       books := []BookWithAuthor{

@@ -31,10 +31,15 @@ type MarshalIncluded interface {
   GetIncluded() []interface{}
 }
 
+type MarshalMeta interface {
+  GetMetaInformation() interface{}
+}
+
 type Document struct {
   Data     *documentData     `json:"data,omitempty"`
   Errors   []*ErrorObject    `json:"errors,omitempty"`
   Included []*ResourceObject `json:"included,omitempty"`
+  Meta     json.RawMessage   `json:"meta,omitempty"`
 }
 
 type documentData struct {
@@ -208,6 +213,15 @@ func marshalDocumentStruct(payload interface{}) (*Document, error) {
       }
     }
   }
+  mm, ok := payload.(MarshalMeta)
+  if ok {
+    meta, err := marshalMeta(mm)
+    if err != nil {
+      return nil, err
+    }
+
+    doc.Meta = meta
+  }
 
   return doc, nil
 }
@@ -282,8 +296,15 @@ func marshalDocumentSlice(payload interface{}) (*Document, error) {
         doc.Included = append(doc.Included, one)
       }
     }
-  }
 
+    if mm, ok := payload.(MarshalMeta); ok {
+    	meta, err := marshalMeta(mm)
+    	if err != nil {
+    		return nil, err
+    	}
+      doc.Meta = meta
+    }
+  }
   return doc, nil
 }
 
@@ -405,6 +426,10 @@ func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject,
   }
 
   return included, nil
+}
+
+func marshalMeta(mm MarshalMeta) (json.RawMessage, error) {
+  return json.Marshal(mm.GetMetaInformation())
 }
 
 func Unmarshal(data []byte, target interface{}) (*Document, error) {
