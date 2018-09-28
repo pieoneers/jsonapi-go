@@ -167,6 +167,43 @@ func(books BooksWithReadersIncluded) GetIncluded() []interface{} {
   return included
 }
 
+type Read struct {
+  ID     string `json:"-"`
+  Reader Reader `json:"-"`
+  Book   Book   `json:"-"`
+}
+
+func(r Read) GetType() string {
+  return "reads"
+}
+
+func(r Read) GetID() string {
+  return r.ID
+}
+
+func(r Read) GetRelationships() map[string]interface{} {
+  return map[string]interface{}{
+    "reader": r.Reader,
+    "book": r.Book,
+  }
+}
+
+func(r *Read) SetID(id string) error {
+  return nil
+}
+
+func(r *Read) SetRelationships(relationships map[string]interface{}) error {
+  if resource, ok := relationships["reader"].(*ResourceObjectIdentifier); ok {
+    r.Reader = Reader{ ID: resource.ID }
+  }
+
+  if resource, ok := relationships["book"].(*ResourceObjectIdentifier); ok {
+    r.Book = Book{ ID: resource.ID }
+  }
+
+  return nil
+}
+
 var _ = Describe("JSONAPI", func() {
 
   Describe("Marshal", func() {
@@ -283,6 +320,43 @@ var _ = Describe("JSONAPI", func() {
             "relationships": {
               "author": {
                 "data": { "type": "authors", "id": "1" }
+              }
+            }
+          }
+        }
+      `
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals single resource object with one to one relationship and no attributes", func() {
+      book := Read{
+        ID: "1",
+        Book: Book{
+          ID:    "1",
+          Title: "An Introduction to Programming in Go",
+          Year:  "2012",
+        },
+        Reader: Reader{
+          ID:   "1",
+          Name: "Fedor Khardikov",
+        },
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "reads",
+            "id": "1",
+            "relationships": {
+              "book": {
+                "data": { "type": "books", "id": "1" }
+              },
+              "reader": {
+                "data": { "type": "people", "id": "1" }
               }
             }
           }
@@ -1177,6 +1251,39 @@ var _ = Describe("JSONAPI", func() {
           Year:  "2012",
         },
         Author: Author{ ID: "1", },
+      }
+
+      _, err := Unmarshal(payload, &actual)
+
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(Equal(expected))
+    })
+
+    It("unmarshals single resource object with one to one relationship and no attributes", func() {
+      payload := []byte(`
+        {
+          "data": {
+            "type": "reads",
+            "relationships": {
+              "reader": {
+                "data": { "type": "people", "id": "1" }
+              },
+              "book": {
+                "data": { "type": "books", "id": "1" }
+              }
+            }
+          }
+        }
+      `)
+
+      actual   := Read{}
+      expected := Read{
+        Reader: Reader{
+          ID: "1",
+        },
+        Book: Book{
+          ID: "1",
+        },
       }
 
       _, err := Unmarshal(payload, &actual)

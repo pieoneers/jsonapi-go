@@ -71,7 +71,7 @@ func(roi ResourceObjectIdentifier) GetType() string {
 
 type ResourceObject struct {
   ResourceObjectIdentifier
-  Attributes    json.RawMessage          `json:"attributes"`
+  Attributes    json.RawMessage          `json:"attributes,omitempty"`
   Relationships map[string]*relationship `json:"relationships,omitempty"`
 }
 
@@ -327,7 +327,9 @@ func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, error
     return one, err
   }
 
-  one.Attributes = buf.Bytes()
+  if !bytes.Equal(buf.Bytes(), []byte("{}\n")) {
+    one.Attributes = buf.Bytes()
+  }
 
   if mr, ok := mri.(MarshalRelationships); ok {
     one.Relationships = marshalRelationships(mr)
@@ -497,9 +499,11 @@ func unmarshalMany(many []*ResourceObject, target interface{}) error {
 func unmarshalResourceObject(ro *ResourceObject, ui UnmarshalResourceIdentifier) error {
   var err error
 
-  err = json.Unmarshal(ro.Attributes, ui)
-  if err != nil {
-    return err
+  if len(ro.Attributes) > 0 {
+    err = json.Unmarshal(ro.Attributes, ui)
+    if err != nil {
+      return err
+    }
   }
 
   err = ui.SetID(ro.ID)
