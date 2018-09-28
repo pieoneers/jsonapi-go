@@ -32,7 +32,7 @@ type MarshalIncluded interface {
 }
 
 type MarshalMeta interface {
-  GetMetaInformation() interface{}
+  GetMeta() interface{}
 }
 
 type Document struct {
@@ -213,6 +213,7 @@ func marshalDocumentStruct(payload interface{}) (*Document, error) {
       }
     }
   }
+
   mm, ok := payload.(MarshalMeta)
   if ok {
     meta, err := marshalMeta(mm)
@@ -429,7 +430,7 @@ func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject,
 }
 
 func marshalMeta(mm MarshalMeta) (json.RawMessage, error) {
-  return json.Marshal(mm.GetMetaInformation())
+  return json.Marshal(mm.GetMeta())
 }
 
 func Unmarshal(data []byte, target interface{}) (*Document, error) {

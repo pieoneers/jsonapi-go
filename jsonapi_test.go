@@ -64,7 +64,7 @@ type BookMeta struct {
 	TotalRead 	 		int `json:"total_read"`
 }
 
-func(b BookWithMeta) GetMetaInformation() interface{} {
+func(b BookWithMeta) GetMeta() interface{} {
 	return BookMeta{
 		NumberOfAuthors: 1,
 		NumberOfReaders: 2,
@@ -72,7 +72,7 @@ func(b BookWithMeta) GetMetaInformation() interface{} {
 	}
 }
 
-func(b BooksWithMeta) GetMetaInformation() interface{} {
+func(b BooksWithMeta) GetMeta() interface{} {
 	return BookMeta{
 		NumberOfAuthors: 2,
 		NumberOfReaders: 3,
