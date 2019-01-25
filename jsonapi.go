@@ -391,7 +391,9 @@ func marshalRelationshipStruct(payload interface{}) *relationship {
 
 func marshalRelationshipSlice(payload interface{}) *relationship {
   relationship := &relationship{
-    Data: &relationshipData{},
+    Data: &relationshipData{
+      Many: make([]*ResourceObjectIdentifier, 0),
+    },
   }
 
   value := reflect.ValueOf(payload)

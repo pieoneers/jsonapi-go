@@ -461,23 +461,21 @@ var _ = Describe("JSONAPI", func() {
       Ω(actual).Should(MatchJSON(expected))
     })
 
-    It("marshals single resource object with one to many relationship included", func() {
-      book := BookWithReadersIncluded{
-        BookWithReaders: BookWithReaders{
-          Book: Book{
-            ID:    "1",
-            Title: "An Introduction to Programming in Go",
-            Year:  "2012",
+    It("marshals single resource object with a to-many relationship", func() {
+      book := BookWithReaders{
+        Book: Book{
+          ID:    "1",
+          Title: "An Introduction to Programming in Go",
+          Year:  "2012",
+        },
+        Readers: []Reader{
+          {
+            ID:   "1",
+            Name: "Fedor Khardikov",
           },
-          Readers: []Reader{
-            {
-              ID:   "1",
-              Name: "Fedor Khardikov",
-            },
-            {
-              ID:   "2",
-              Name: "Andrew Manshin",
-            },
+          {
+            ID:   "2",
+            Name: "Andrew Manshin",
           },
         },
       }
@@ -502,23 +500,43 @@ var _ = Describe("JSONAPI", func() {
                 ]
               }
             }
+          }
+        }
+      `
+
+      Ω(err).Should(BeNil())
+      Ω(actual).Should(MatchJSON(expected))
+    })
+
+    It("marshals single resource object with an empty to-many relationship included", func() {
+      book := BookWithReadersIncluded{
+        BookWithReaders: BookWithReaders{
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
           },
-          "included": [
-            {
-              "type": "people",
-              "id": "1",
-              "attributes": {
-                "name": "Fedor Khardikov"
-              }
+        },
+      }
+
+      bytes, err := Marshal(book)
+
+      actual   := string(bytes)
+      expected := `
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
             },
-            {
-              "type": "people",
-              "id": "2",
-              "attributes": {
-                "name": "Andrew Manshin"
+            "relationships": {
+              "readers": {
+                "data": []
               }
             }
-          ]
+          }
         }
       `
 
