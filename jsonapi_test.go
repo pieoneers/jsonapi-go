@@ -3,6 +3,7 @@ package jsonapi_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+  . "github.com/Benjamintf1/unmarshalledmatchers"
 
 	. "github.com/pieoneers/jsonapi-go"
 )
@@ -981,7 +982,7 @@ var _ = Describe("JSONAPI", func() {
       `
 
       Ω(err).Should(BeNil())
-      Ω(actual).Should(MatchJSON(expected))
+      Ω(actual).Should(MatchUnorderedJSON(expected))
     })
 
     It("marshals multiple resource objects with one to many relationships included", func() {
@@ -1092,7 +1093,7 @@ var _ = Describe("JSONAPI", func() {
       `
 
       Ω(err).Should(BeNil())
-      Ω(actual).Should(MatchJSON(expected))
+      Ω(actual).Should(MatchUnorderedJSON(expected))
     })
 
     It("marshals resource objects collection with one to many relationships included", func() {
@@ -1199,7 +1200,7 @@ var _ = Describe("JSONAPI", func() {
       `
 
       Ω(err).Should(BeNil())
-      Ω(actual).Should(MatchJSON(expected))
+      Ω(actual).Should(MatchUnorderedJSON(expected))
     })
 
     It("marshals empty collection into empty array", func() {

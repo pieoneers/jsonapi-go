@@ -1,9 +1,7 @@
 package jsonapi
 
 import (
-  "sort"
   "bytes"
-  "strings"
   "reflect"
   "encoding/json"
 )
@@ -177,14 +175,6 @@ func marshalDocument(payload interface{}) (*Document, error) {
   if err != nil {
     return nil, err
   }
-
-  sort.Slice(doc.Included, func(i, j int) bool {
-    return strings.Compare(doc.Included[i].Type, doc.Included[j].Type) == -1
-  })
-
-  sort.Slice(doc.Included, func(i, j int) bool {
-    return strings.Compare(doc.Included[i].ID, doc.Included[j].ID) == -1
-  })
 
   return doc, nil
 }
@@ -402,10 +392,6 @@ func marshalRelationshipSlice(payload interface{}) *relationship {
     one := marshalResourceObjectIdentifier(value.Index(i).Interface().(MarshalResourceIdentifier))
     relationship.Data.Many = append(relationship.Data.Many, &one)
   }
-
-  sort.Slice(relationship.Data.Many, func(i, j int) bool {
-    return strings.Compare(relationship.Data.Many[i].ID, relationship.Data.Many[j].ID) == -1
-  })
 
   return relationship
 }

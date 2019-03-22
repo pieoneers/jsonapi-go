@@ -1,6 +1,7 @@
 module github.com/pieoneers/jsonapi-go
 
 require (
+	github.com/Benjamintf1/unmarshalledmatchers v0.0.0-20180622171218-f49d1795d752
 	github.com/onsi/ginkgo v1.5.0
 	github.com/onsi/gomega v1.4.0
 	golang.org/x/net v0.0.0-20180702212446-ed29d75add3d
