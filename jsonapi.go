@@ -197,11 +197,7 @@ func marshalDocumentStruct(payload interface{}) (*Document, error) {
       return nil, err
     }
 
-    for _, inc := range included {
-      for _, one := range inc {
-        doc.Included = append(doc.Included, one)
-      }
-    }
+    doc.Included = included
   }
 
   mm, ok := payload.(MarshalMeta)
@@ -238,53 +234,25 @@ func marshalDocumentSlice(payload interface{}) (*Document, error) {
 
     doc.Data.Many = many
 
-    included := make(map[string]map[string]*ResourceObject)
-
     if mi, ok := payload.(MarshalIncluded); ok {
-      inc, err := marshalIncluded(mi)
-      if err != nil {
-        return nil, err
+      included, marshalIncludedErr := marshalIncluded(mi)
+      if marshalIncludedErr != nil {
+        return nil, marshalIncludedErr
       }
 
-      for typ, value := range inc {
-        if _, ok := included[typ]; !ok {
-          included[typ] = make(map[string]*ResourceObject)
-        }
-
-        for id, one := range value {
-          if _, ok := included[typ][id]; !ok {
-            included[typ][id] = one
-          }
-        }
-      }
+      doc.Included = included
     } else {
       value := reflect.ValueOf(payload)
 
       for i := 0; i < value.Len(); i++ {
         if mi, ok := value.Index(i).Interface().(MarshalIncluded); ok {
-          inc, err := marshalIncluded(mi)
-          if err != nil {
-            return nil, err
+          included, marshalIncludedErr := marshalIncluded(mi)
+          if marshalIncludedErr != nil {
+            return nil, marshalIncludedErr
           }
 
-          for typ, value := range inc {
-            if _, ok := included[typ]; !ok {
-              included[typ] = make(map[string]*ResourceObject)
-            }
-
-            for id, one := range value {
-              if _, ok := included[typ][id]; !ok {
-                included[typ][id] = one
-              }
-            }
-          }
+          doc.Included = append(doc.Included, included...)
         }
-      }
-    }
-
-    for _, inc := range included {
-      for _, one := range inc {
-        doc.Included = append(doc.Included, one)
       }
     }
 
@@ -396,8 +364,10 @@ func marshalRelationshipSlice(payload interface{}) *relationship {
   return relationship
 }
 
-func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject, error) {
-  included := make(map[string]map[string]*ResourceObject)
+func marshalIncluded(mi MarshalIncluded) ([]*ResourceObject, error) {
+  var included []*ResourceObject
+
+  // included := make(map[string]map[string]*ResourceObject)
 
   for _, value := range mi.GetIncluded() {
     ro, err := marshalResourceObject(value.(MarshalResourceIdentifier))
@@ -405,15 +375,16 @@ func marshalIncluded(mi MarshalIncluded) (map[string]map[string]*ResourceObject,
       return included, err
     }
 
-    typ, id := ro.Type, ro.ID
+    // typ, id := ro.Type, ro.ID
 
-    if _, ok := included[typ]; !ok {
-      included[typ] = make(map[string]*ResourceObject)
-    }
+    // if _, ok := included[typ]; !ok {
+    //   included[typ] = make(map[string]*ResourceObject)
+    // }
 
-    if _, ok := included[typ][id]; !ok {
-      included[typ][id] = &ro
-    }
+    // if _, ok := included[typ][id]; !ok {
+    //   included[typ][id] = &ro
+    // }
+    included = append(included, &ro)
   }
 
   return included, nil

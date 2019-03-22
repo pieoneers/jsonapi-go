@@ -112,8 +112,16 @@ type BooksWithAuthorIncluded []BookWithAuthor
 func(books BooksWithAuthorIncluded) GetIncluded() []interface{} {
   var included []interface{}
 
+  authorsMap := make(map[string]Author)
+
   for _, book := range books {
-    included = append(included, book.Author)
+    author := book.Author
+
+    authorsMap[author.ID] = author
+  }
+
+  for _, author := range authorsMap {
+    included = append(included, author)
   }
 
   return included
@@ -144,10 +152,10 @@ type BookWithReadersIncluded struct {
   BookWithReaders
 }
 
-func(b BookWithReadersIncluded) GetIncluded() []interface{} {
+func(book BookWithReadersIncluded) GetIncluded() []interface{} {
   var included []interface{}
 
-  for _, reader := range b.Readers {
+  for _, reader := range book.Readers {
     included = append(included, reader)
   }
 
@@ -159,10 +167,16 @@ type BooksWithReadersIncluded []BookWithReaders
 func(books BooksWithReadersIncluded) GetIncluded() []interface{} {
   var included []interface{}
 
+  readersMap := make(map[string]Reader)
+
   for _, book := range books {
     for _, reader := range book.Readers {
-      included = append(included, reader)
+      readersMap[reader.ID] = reader
     }
+  }
+
+  for _, reader := range readersMap {
+    included = append(included, reader)
   }
 
   return included
@@ -819,6 +833,13 @@ var _ = Describe("JSONAPI", func() {
               "attributes": {
                 "name": "Caleb Doxsey"
               }
+            },
+            {
+              "type": "authors",
+              "id": "1",
+              "attributes": {
+                "name": "Caleb Doxsey"
+              }
             }
           ]
         }
@@ -988,7 +1009,7 @@ var _ = Describe("JSONAPI", func() {
     It("marshals multiple resource objects with one to many relationships included", func() {
       books := []BookWithReadersIncluded{
         {
-          BookWithReaders {
+          BookWithReaders{
             Book: Book{
               ID:    "1",
               Title: "An Introduction to Programming in Go",
@@ -1007,7 +1028,7 @@ var _ = Describe("JSONAPI", func() {
           },
         },
         {
-          BookWithReaders {
+          BookWithReaders{
             Book: Book{
               ID:    "2",
               Title: "Introducing Go",
@@ -1067,6 +1088,13 @@ var _ = Describe("JSONAPI", func() {
             }
           ],
           "included": [
+            {
+              "type": "people",
+              "id": "1",
+              "attributes": {
+                "name": "Fedor Khardikov"
+              }
+            },
             {
               "type": "people",
               "id": "1",
