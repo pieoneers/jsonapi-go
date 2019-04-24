@@ -25,6 +25,22 @@ type UnmarshalRelationships interface {
   SetRelationships(map[string]interface{}) error
 }
 
+type MarshalData interface {
+  GetData() interface{}
+}
+
+type UnmarshalData interface {
+  SetData(func(interface{}) error) error
+}
+
+type MarshalErrors interface {
+  GetErrors() []*ErrorObject
+}
+
+type UnmarshalErrors interface {
+  SetErrors(errors []*ErrorObject) error
+}
+
 type MarshalIncluded interface {
   GetIncluded() []interface{}
 }
@@ -70,6 +86,7 @@ func(roi ResourceObjectIdentifier) GetType() string {
 type ResourceObject struct {
   ResourceObjectIdentifier
   Attributes    json.RawMessage          `json:"attributes,omitempty"`
+  Meta          json.RawMessage          `json:"meta,omitempty"`
   Relationships map[string]*relationship `json:"relationships,omitempty"`
 }
 
@@ -113,7 +130,7 @@ func(d *documentData) UnmarshalJSON(payload []byte) error {
 }
 
 func(d *relationshipData) MarshalJSON() ([]byte, error) {
-  if d.One != nil {
+  if d.One != nil && len(d.One.ID) > 0 {
     return json.Marshal(d.One)
   }
   return json.Marshal(d.Many)
@@ -160,110 +177,50 @@ func Marshal(payload interface{}) ([]byte, error) {
 }
 
 func marshalDocument(payload interface{}) (*Document, error) {
-  var (
-    doc *Document
-    err error
-  )
+  doc := &Document{}
 
-  switch reflect.TypeOf(payload).Kind() {
-  case reflect.Struct:
-    doc, err = marshalDocumentStruct(payload)
-  case reflect.Slice:
-    doc, err = marshalDocumentSlice(payload)
-  }
+  switch asserted := payload.(type) {
+	case MarshalData:
+    doc.Data = &documentData{}
 
-  if err != nil {
-    return nil, err
-  }
+    data := asserted.GetData()
 
-  return doc, nil
-}
-
-func marshalDocumentStruct(payload interface{}) (*Document, error) {
-  doc := &Document{
-    Data: &documentData{},
-  }
-
-  one, err := marshalResourceObject(payload.(MarshalResourceIdentifier))
-  if err != nil {
-    return nil, err
-  }
-
-  doc.Data.One = &one
+    switch reflect.TypeOf(data).Kind() {
+    case reflect.Struct:
+      if one, err := marshalResourceObject(data.(MarshalResourceIdentifier)); err == nil {
+        doc.Data.One = &one
+      } else {
+        return nil, err
+      }
+    case reflect.Slice:
+      if many, err := marshalResourceObjects(data); err == nil {
+        doc.Data.Many = many
+      } else {
+        return nil, err
+      }
+    }
+	case MarshalErrors:
+    doc.Errors = asserted.GetErrors()
+	}
 
   if mi, ok := payload.(MarshalIncluded); ok {
-    included, err := marshalIncluded(mi)
-    if err != nil {
-      return nil, err
-    }
-
-    doc.Included = included
-  }
-
-  mm, ok := payload.(MarshalMeta)
-  if ok {
-    meta, err := marshalMeta(mm)
-    if err != nil {
-      return nil, err
-    }
-
-    doc.Meta = meta
-  }
-
-  return doc, nil
-}
-
-func marshalDocumentSlice(payload interface{}) (*Document, error) {
-  var doc *Document
-
-  if errorObjects, ok := payload.([]*ErrorObject); ok {
-    doc = &Document{
-      Errors: errorObjects,
-    }
-  } else {
-    doc = &Document{
-      Data: &documentData{
-        Many: []*ResourceObject{},
-      },
-    }
-
-    many, err := marshalResourceObjects(payload)
-    if err != nil {
-      return nil, err
-    }
-
-    doc.Data.Many = many
-
-    if mi, ok := payload.(MarshalIncluded); ok {
-      included, marshalIncludedErr := marshalIncluded(mi)
-      if marshalIncludedErr != nil {
-        return nil, marshalIncludedErr
-      }
-
+    if included, err := marshalIncluded(mi); err == nil {
       doc.Included = included
     } else {
-      value := reflect.ValueOf(payload)
-
-      for i := 0; i < value.Len(); i++ {
-        if mi, ok := value.Index(i).Interface().(MarshalIncluded); ok {
-          included, marshalIncludedErr := marshalIncluded(mi)
-          if marshalIncludedErr != nil {
-            return nil, marshalIncludedErr
-          }
-
-          doc.Included = append(doc.Included, included...)
-        }
-      }
-    }
-
-    if mm, ok := payload.(MarshalMeta); ok {
-    	meta, err := marshalMeta(mm)
-    	if err != nil {
-    		return nil, err
-    	}
-      doc.Meta = meta
+      return nil, err
     }
   }
+
+  if mm, ok := payload.(MarshalMeta); ok {
+    if meta, err := marshalMeta(mm); err == nil {
+      if !bytes.Equal(meta, []byte("{}\n")) {
+        doc.Meta = meta
+      }
+    } else {
+      return nil, err
+    }
+  }
+
   return doc, nil
 }
 
@@ -285,8 +242,20 @@ func marshalResourceObject(mri MarshalResourceIdentifier) (ResourceObject, error
     return one, err
   }
 
-  if !bytes.Equal(buf.Bytes(), []byte("{}\n")) {
-    one.Attributes = buf.Bytes()
+  attributes := buf.Bytes()
+
+  if !bytes.Equal(attributes, []byte("{}\n")) {
+    one.Attributes = attributes
+  }
+
+  if mm, ok := mri.(MarshalMeta); ok {
+    if meta, err := marshalMeta(mm); err == nil {
+      if !bytes.Equal(meta, []byte("{}\n")) {
+        one.Meta = meta
+      }
+    } else {
+      return one, err
+    }
   }
 
   if mr, ok := mri.(MarshalRelationships); ok {
@@ -367,23 +336,12 @@ func marshalRelationshipSlice(payload interface{}) *relationship {
 func marshalIncluded(mi MarshalIncluded) ([]*ResourceObject, error) {
   var included []*ResourceObject
 
-  // included := make(map[string]map[string]*ResourceObject)
-
   for _, value := range mi.GetIncluded() {
     ro, err := marshalResourceObject(value.(MarshalResourceIdentifier))
     if err != nil {
       return included, err
     }
 
-    // typ, id := ro.Type, ro.ID
-
-    // if _, ok := included[typ]; !ok {
-    //   included[typ] = make(map[string]*ResourceObject)
-    // }
-
-    // if _, ok := included[typ][id]; !ok {
-    //   included[typ][id] = &ro
-    // }
     included = append(included, &ro)
   }
 
@@ -391,60 +349,72 @@ func marshalIncluded(mi MarshalIncluded) ([]*ResourceObject, error) {
 }
 
 func marshalMeta(mm MarshalMeta) (json.RawMessage, error) {
-  return json.Marshal(mm.GetMeta())
+  buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+
+  meta := mm.GetMeta()
+
+  err := enc.Encode(meta)
+
+  return buf.Bytes(), err
 }
 
 func Unmarshal(data []byte, target interface{}) (*Document, error) {
-  var err error
-
   doc := &Document{}
 
-  err = json.Unmarshal(data, doc)
-  if err != nil {
+  if err := json.Unmarshal(data, doc); err != nil {
     return doc, err
   }
 
-  errs := doc.Errors
-  if errs != nil {
-    return doc, err
+  switch asserted := target.(type) {
+  case UnmarshalData:
+    if one := doc.Data.One; one != nil {
+      if err := asserted.SetData(func(target interface{}) error {
+        return unmarshalOne(one, target)
+      }); err != nil {
+        return doc, err
+      }
+    }
+
+    if many := doc.Data.Many; many != nil {
+      if err := asserted.SetData(func(target interface{}) error {
+        return unmarshalMany(many, target)
+      }); err != nil {
+        return doc, err
+      }
+    }
+  case UnmarshalErrors:
+    asserted.SetErrors(doc.Errors)
   }
 
-  one := doc.Data.One
-  if one != nil {
-    err = unmarshalOne(one, target)
-  }
-
-  many := doc.Data.Many
-  if many != nil {
-    err = unmarshalMany(many, target)
-  }
-
-  return doc, err
+  return doc, nil
 }
 
 func unmarshalOne(one *ResourceObject, target interface{}) error {
-  asserted := target.(UnmarshalResourceIdentifier)
-
-  err := unmarshalResourceObject(one, asserted)
-  if err != nil {
-    return err
-  }
-
-  return nil
+  return unmarshalResourceObject(one, target.(UnmarshalResourceIdentifier))
 }
 
 func unmarshalMany(many []*ResourceObject, target interface{}) error {
-  typ := reflect.TypeOf(target).Elem().Elem().Elem()
   ptr := reflect.ValueOf(target)
   val := ptr.Elem()
 
+  typ := reflect.TypeOf(target).Elem().Elem()
+  knd := typ.Kind()
+
+  if knd == reflect.Ptr {
+    typ = typ.Elem()
+  }
+
   for _, one := range many {
     new := reflect.New(typ)
-    asserted := new.Interface().(UnmarshalResourceIdentifier)
 
-    err := unmarshalResourceObject(one, asserted)
-    if err != nil {
-      return nil
+    if err := unmarshalResourceObject(one, new.Interface().(UnmarshalResourceIdentifier)); err != nil {
+      return err
+    }
+
+    if knd == reflect.Struct {
+      new = new.Elem()
     }
 
     val = reflect.Append(val, new)
@@ -456,23 +426,18 @@ func unmarshalMany(many []*ResourceObject, target interface{}) error {
 }
 
 func unmarshalResourceObject(ro *ResourceObject, ui UnmarshalResourceIdentifier) error {
-  var err error
-
   if len(ro.Attributes) > 0 {
-    err = json.Unmarshal(ro.Attributes, ui)
-    if err != nil {
+    if err := json.Unmarshal(ro.Attributes, ui); err != nil {
       return err
     }
   }
 
-  err = ui.SetID(ro.ID)
-  if err != nil {
+  if err := ui.SetID(ro.ID); err != nil {
     return err
   }
 
   if ur, ok := ui.(UnmarshalRelationships); ok {
-    err = unmarshalRelationships(ro, ur)
-    if err != nil {
+    if err := unmarshalRelationships(ro, ur); err != nil {
       return err
     }
   }
@@ -484,19 +449,16 @@ func unmarshalRelationships(ro *ResourceObject, ur UnmarshalRelationships) error
   relationships := map[string]interface{}{}
 
   for k, v := range ro.Relationships {
-    one := v.Data.One
-    if one != nil {
+    if one := v.Data.One; one != nil {
       relationships[k] = one
     }
 
-    many := v.Data.Many
-    if many != nil {
+    if many := v.Data.Many; many != nil {
       relationships[k] = many
     }
   }
 
-  err := ur.SetRelationships(relationships)
-  if err != nil {
+  if err := ur.SetRelationships(relationships); err != nil {
     return err
   }
 
