@@ -385,7 +385,9 @@ func Unmarshal(data []byte, target interface{}) (*Document, error) {
       }
     }
   case UnmarshalErrors:
-    asserted.SetErrors(doc.Errors)
+    if errors := doc.Errors; errors != nil {
+      asserted.SetErrors(errors)
+    }
   }
 
   return doc, nil
