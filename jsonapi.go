@@ -367,8 +367,7 @@ func Unmarshal(data []byte, target interface{}) (*Document, error) {
     return doc, err
   }
 
-  switch asserted := target.(type) {
-  case UnmarshalData:
+  if asserted, ok := target.(UnmarshalData); ok {
     if one := doc.Data.One; one != nil {
       if err := asserted.SetData(func(target interface{}) error {
         return unmarshalOne(one, target)
@@ -384,7 +383,9 @@ func Unmarshal(data []byte, target interface{}) (*Document, error) {
         return doc, err
       }
     }
-  case UnmarshalErrors:
+  }
+
+  if asserted, ok := target.(UnmarshalErrors); ok {
     if errors := doc.Errors; errors != nil {
       asserted.SetErrors(errors)
     }
