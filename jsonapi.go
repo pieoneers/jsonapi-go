@@ -367,7 +367,8 @@ func Unmarshal(data []byte, target interface{}) (*Document, error) {
     return doc, err
   }
 
-  if asserted, ok := target.(UnmarshalData); ok {
+  if asserted, ok := target.(UnmarshalData); ok && doc.Data != nil {
+
     if one := doc.Data.One; one != nil {
       if err := asserted.SetData(func(target interface{}) error {
         return unmarshalOne(one, target)
@@ -385,10 +386,8 @@ func Unmarshal(data []byte, target interface{}) (*Document, error) {
     }
   }
 
-  if asserted, ok := target.(UnmarshalErrors); ok {
-    if errors := doc.Errors; errors != nil {
-      asserted.SetErrors(errors)
-    }
+  if asserted, ok := target.(UnmarshalErrors); ok && doc.Errors != nil {
+    asserted.SetErrors(doc.Errors)
   }
 
   return doc, nil
@@ -452,12 +451,16 @@ func unmarshalRelationships(ro *ResourceObject, ur UnmarshalRelationships) error
   relationships := map[string]interface{}{}
 
   for k, v := range ro.Relationships {
-    if one := v.Data.One; one != nil {
-      relationships[k] = one
-    }
+    data := v.Data
 
-    if many := v.Data.Many; many != nil {
-      relationships[k] = many
+    if data != nil {
+      if one := data.One; one != nil {
+        relationships[k] = one
+      }
+
+      if many := data.Many; many != nil {
+        relationships[k] = many
+      }
     }
   }
 

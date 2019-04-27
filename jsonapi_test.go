@@ -328,6 +328,10 @@ func(v ErrorsView) GetErrors() []*ErrorObject {
   return v.ValidationErrors
 }
 
+func(v *ErrorsView) SetData(to func(target interface{}) error) error {
+  return nil
+}
+
 func(v *ErrorsView) SetErrors(errors []*ErrorObject) error {
   v.ValidationErrors = errors
   return nil
@@ -335,7 +339,7 @@ func(v *ErrorsView) SetErrors(errors []*ErrorObject) error {
 
 var _ = Describe("JSONAPI", func() {
 
-  FDescribe("Marshal", func() {
+  Describe("Marshal", func() {
 
     It("marshals single resource object", func() {
       view := BookView{
@@ -1290,7 +1294,7 @@ var _ = Describe("JSONAPI", func() {
     })
   })
 
-  FDescribe("Unmarshal", func() {
+  Describe("Unmarshal", func() {
 
     It("unmarshals single resource object", func() {
       payload := []byte(`
