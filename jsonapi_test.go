@@ -596,6 +596,58 @@ var _ = Describe("JSONAPI", func() {
       Ω(err).ShouldNot(HaveOccurred())
     })
 
+    Measure("it should do something hard efficiently", func(b Benchmarker) {
+      runtime := b.Time("runtime", func() {
+        view := BookWithReadersView{
+          Book: BookWithReaders{
+            Book: Book{
+              ID:    "1",
+              Title: "An Introduction to Programming in Go",
+              Year:  "2012",
+            },
+            Readers: Readers{
+              {
+                ID:   "1",
+                Name: "Fedor Khardikov",
+              },
+              {
+                ID:   "2",
+                Name: "Andrew Manshin",
+              },
+            },
+          },
+        }
+
+        result, err := Marshal(view)
+
+        expected := `
+          {
+            "data": {
+              "type": "books",
+              "id": "1",
+              "attributes": {
+                "title": "An Introduction to Programming in Go",
+                "year": "2012"
+              },
+              "relationships": {
+                "readers": {
+                  "data": [
+                    { "type": "people", "id": "1" },
+                    { "type": "people", "id": "2" }
+                  ]
+                }
+              }
+            }
+          }
+        `
+
+        Ω(result).Should(MatchJSON(expected))
+        Ω(err).ShouldNot(HaveOccurred())
+      })
+
+      Ω(runtime.Seconds()).Should(BeNumerically("<", 0.1), "Marshal() shouldn't take too long.")
+    }, 1000)
+
     It("marshals single resource object with to-many relationship", func() {
       view := BookWithReadersView{
         Book: BookWithReaders{
@@ -1360,6 +1412,40 @@ var _ = Describe("JSONAPI", func() {
       Ω(err).ShouldNot(HaveOccurred())
     })
 
+    It("unmarshals resource object with empty to-one relationship", func() {
+      payload := []byte(`
+        {
+          "data": {
+            "type": "books",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            },
+            "relationships": {
+              "author": {
+                "data": null
+              }
+            }
+          }
+        }
+      `)
+
+      result   := BookWithAuthorView{}
+      expected := BookWithAuthorView{
+        Book: BookWithAuthor{
+          Book: Book{
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
+          },
+        },
+      }
+
+      _, err := Unmarshal(payload, &result)
+
+      Ω(result).Should(Equal(expected))
+      Ω(err).ShouldNot(HaveOccurred())
+    })
+
     It("unmarshals resource object with to-one relationship and no attributes", func() {
       payload := []byte(`
         {
@@ -1427,6 +1513,42 @@ var _ = Describe("JSONAPI", func() {
           Readers: Readers{
             { ID: "1" },
             { ID: "2" },
+          },
+        },
+      }
+
+      _, err := Unmarshal(payload, &result)
+
+      Ω(result).Should(Equal(expected))
+      Ω(err).ShouldNot(HaveOccurred())
+    })
+
+    It("unmarshals resource object with empty to-many relationship", func() {
+      payload := []byte(`
+        {
+          "data": {
+            "type": "books",
+            "id": "1",
+            "attributes": {
+              "title": "An Introduction to Programming in Go",
+              "year": "2012"
+            },
+            "relationships": {
+              "readers": {
+                "data": []
+              }
+            }
+          }
+        }
+      `)
+
+      result   := BookWithReadersView{}
+      expected := BookWithReadersView{
+        Book: BookWithReaders{
+          Book: Book{
+            ID:    "1",
+            Title: "An Introduction to Programming in Go",
+            Year:  "2012",
           },
         },
       }
