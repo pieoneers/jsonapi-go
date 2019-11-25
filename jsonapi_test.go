@@ -1611,12 +1611,14 @@ var _ = Describe("JSONAPI", func() {
           "errors": [
             {
               "title": "is required",
+              "code": "is_required",
               "source": {
                 "pointer": "/data/attributes/title"
               }
             },
             {
               "title": "is required to be in the past",
+              "code": "is_required",
               "source": {
                 "pointer": "/data/attributes/year"
               }
@@ -1630,12 +1632,14 @@ var _ = Describe("JSONAPI", func() {
         ValidationErrors: []*ErrorObject{
           {
             Title: "is required",
+            Code: "is_required",
             Source: ErrorObjectSource{
               Pointer: "/data/attributes/title",
             },
           },
           {
             Title: "is required to be in the past",
+            Code: "is_required",
             Source: ErrorObjectSource{
               Pointer: "/data/attributes/year",
             },

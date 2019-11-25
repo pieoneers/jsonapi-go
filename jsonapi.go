@@ -92,6 +92,7 @@ type ResourceObject struct {
 
 type ErrorObject struct {
   Title  string            `json:"title,omitempty"`
+  Code   string            `json:"code,omitempty"`
   Source ErrorObjectSource `json:"source,omitempty"`
 }
 
