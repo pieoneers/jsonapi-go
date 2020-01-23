@@ -15,6 +15,7 @@ type MarshalResourceIdentifier interface {
 
 type UnmarshalResourceIdentifier interface {
   SetID(string) error
+  SetType(string) error
 }
 
 type MarshalRelationships interface {
@@ -436,6 +437,10 @@ func unmarshalResourceObject(ro *ResourceObject, ui UnmarshalResourceIdentifier)
   }
 
   if err := ui.SetID(ro.ID); err != nil {
+    return err
+  }
+
+  if err := ui.SetType(ro.ResourceObjectIdentifier.Type); err != nil {
     return err
   }
 

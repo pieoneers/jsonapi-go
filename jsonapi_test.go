@@ -8,9 +8,10 @@ import (
 )
 
 type Book struct {
-  ID    string   `json:"-"`
-  Title string   `json:"title"`
-  Year  string   `json:"year"`
+  ID    string `json:"-"`
+  Title string `json:"title"`
+  Year  string `json:"year"`
+  Type  string `json:"-"`
 }
 
 func(b Book) GetID() string {
@@ -22,8 +23,13 @@ func(b *Book) SetID(id string) error {
   return nil
 }
 
+func(b *Book) SetType(t string) error {
+  b.Type = t
+  return nil
+}
+
 func(b Book) GetType() string {
-  return "books"
+  return b.Type
 }
 
 type BookWithMeta struct {
@@ -300,6 +306,10 @@ func(o *Order) SetID(id string) error {
   return nil
 }
 
+func(v *Order) SetType(to string) error {
+  return nil
+}
+
 func(o Order) GetRelationships() map[string]interface{} {
   return map[string]interface{}{
     "book": o.Book,
@@ -347,6 +357,7 @@ var _ = Describe("JSONAPI", func() {
           ID:    "1",
           Title: "An Introduction to Programming in Go",
           Year:  "2012",
+          Type:  "books",
         },
       }
 
@@ -375,6 +386,7 @@ var _ = Describe("JSONAPI", func() {
           ID:    "1",
           Title: "An Introduction to Programming in Go",
           Year:  "2012",
+          Type:  "books",
         },
       }
 
@@ -404,6 +416,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           Meta: BookMeta{
             Sold: 10,
@@ -440,6 +453,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           Author: Author{
             ID:   "1",
@@ -479,6 +493,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
         },
       }
@@ -515,6 +530,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           Reader: Reader{
             ID:   "1",
@@ -554,6 +570,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "1",
               Title: "An Introduction to Programming in Go",
               Year:  "2012",
+              Type:  "books",
             },
             Author: Author{
               ID:   "1",
@@ -604,6 +621,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "1",
               Title: "An Introduction to Programming in Go",
               Year:  "2012",
+              Type:  "books",
             },
             Readers: Readers{
               {
@@ -655,6 +673,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           Readers: Readers{
             {
@@ -704,6 +723,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "1",
               Title: "An Introduction to Programming in Go",
               Year:  "2012",
+              Type:  "books",
             },
             Readers: Readers{
               {
@@ -769,6 +789,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
         },
       }
@@ -804,11 +825,13 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           {
             ID:    "2",
             Title: "Introducing Go",
             Year:  "2016",
+            Type:  "books",
           },
         },
       }
@@ -849,11 +872,13 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           {
             ID:    "2",
             Title: "Introducing Go",
             Year:  "2016",
+            Type:  "books",
           },
         },
       }
@@ -895,11 +920,13 @@ var _ = Describe("JSONAPI", func() {
               ID:    "1",
               Title: "An Introduction to Programming in Go",
               Year:  "2012",
+              Type:  "books",
             },
             {
               ID:    "2",
               Title: "Introducing Go",
               Year:  "2016",
+              Type:  "books",
             },
           },
         },
@@ -948,6 +975,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "1",
               Title: "An Introduction to Programming in Go",
               Year:  "2012",
+              Type:  "books",
             },
             Author: Author{
               ID:   "1",
@@ -959,6 +987,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "2",
               Title: "Introducing Go",
               Year:  "2016",
+              Type:  "books",
             },
             Author: Author{
               ID:   "1",
@@ -1016,6 +1045,7 @@ var _ = Describe("JSONAPI", func() {
                 ID:    "1",
                 Title: "An Introduction to Programming in Go",
                 Year:  "2012",
+                Type:  "books",
               },
               Author: Author{
                 ID:   "1",
@@ -1027,6 +1057,7 @@ var _ = Describe("JSONAPI", func() {
                 ID:    "2",
                 Title: "Introducing Go",
                 Year:  "2016",
+                Type:  "books",
               },
               Author: Author{
                 ID:   "1",
@@ -1100,6 +1131,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "1",
               Title: "An Introduction to Programming in Go",
               Year:  "2012",
+              Type:  "books",
             },
             Readers: Readers{
               {
@@ -1117,6 +1149,7 @@ var _ = Describe("JSONAPI", func() {
               ID:    "2",
               Title: "Introducing Go",
               Year:  "2016",
+              Type:  "books",
             },
             Readers: Readers{
               {
@@ -1186,6 +1219,7 @@ var _ = Describe("JSONAPI", func() {
                 ID:    "1",
                 Title: "An Introduction to Programming in Go",
                 Year:  "2012",
+                Type:  "books",
               },
               Readers: Readers{
                 {
@@ -1203,6 +1237,7 @@ var _ = Describe("JSONAPI", func() {
                 ID:    "2",
                 Title: "Introducing Go",
                 Year:  "2016",
+                Type:  "books",
               },
               Readers: Readers{
                 {
@@ -1368,6 +1403,7 @@ var _ = Describe("JSONAPI", func() {
           ID: "1",
           Title: "An Introduction to Programming in Go",
           Year:  "2012",
+          Type:  "books",
         },
       }
 
@@ -1381,6 +1417,7 @@ var _ = Describe("JSONAPI", func() {
       payload := []byte(`
         {
           "data": {
+            "id": "1",
             "type": "books",
             "attributes": {
               "title": "An Introduction to Programming in Go",
@@ -1399,8 +1436,10 @@ var _ = Describe("JSONAPI", func() {
       expected := BookWithAuthorView{
         Book: BookWithAuthor{
           Book: Book{
+            ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           Author: Author{ ID: "1" },
         },
@@ -1416,6 +1455,7 @@ var _ = Describe("JSONAPI", func() {
       payload := []byte(`
         {
           "data": {
+            "id": "1",
             "type": "books",
             "attributes": {
               "title": "An Introduction to Programming in Go",
@@ -1434,8 +1474,10 @@ var _ = Describe("JSONAPI", func() {
       expected := BookWithAuthorView{
         Book: BookWithAuthor{
           Book: Book{
+            ID: "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
         },
       }
@@ -1509,6 +1551,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           Readers: Readers{
             { ID: "1" },
@@ -1549,6 +1592,7 @@ var _ = Describe("JSONAPI", func() {
             ID:    "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
         },
       }
@@ -1590,11 +1634,13 @@ var _ = Describe("JSONAPI", func() {
             ID: "1",
             Title: "An Introduction to Programming in Go",
             Year:  "2012",
+            Type:  "books",
           },
           {
             ID: "2",
             Title: "Introducing Go",
             Year:  "2016",
+            Type:  "books",
           },
         },
       }
