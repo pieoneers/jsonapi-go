@@ -16,6 +16,319 @@ Go to jsonapi-go package directory and run:
 ```go test```
 
 ### Usage
+#### Marshal
+For instance we have Go program what implements simple library, we have `Book` and `Author` structs:
+```go
+type Book struct {
+	ID              string   
+	AuthorID        string   
+	Title           string   
+	PublicationDate time.Time
+}
+
+type Author struct {
+	ID        string
+	FirstName string
+	LastName  string
+}
+```
+
+We want to produce the JSON representation of the data. Let's modify the struct by adding json tags to it and implement functions `GetID` and `GetType` as required for [MarshalResourceIdentifier interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalResourceIdentifier), one more function `GetData` required for [MarshalData interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalData).
+
+```go
+type Book struct {
+	ID              string    `json:"-"`
+	AuthorID        string    `json:"-"`
+	Title           string    `json:"title"`
+	PublicationDate time.Time `json:"publication_date"`
+}
+
+func (b Book) GetID() string {
+	return b.ID
+}
+
+func (b Book) GetType() string {
+	return "books"
+}
+
+func (b Book) GetData() interface{} {
+	return b
+}
+
+type Author struct {
+	ID        string `json:"-"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+func (a Author) GetID() string {
+	return a.ID
+}
+
+func (a Author) GetType() string {
+	return "authors"
+}
+
+func (a Author) GetData() interface{} {
+	return a
+}
+```
+
+By running [Marshal](https://godoc.org/github.com/pieoneers/jsonapi-go#Marshal) function for `Book` and `Author` the output will be a `[]byte` of json data.
+
+Initial data:
+```go
+alan := Author{
+	ID:        "1",
+	FirstName: "Alan A. A.",
+	LastName:  "Donovan",
+}
+
+publicationDate, _ := time.Parse(time.RFC3339, "2015-01-01T00:00:00Z")
+
+book := Book{
+	ID:              "1",
+	Title:           "Go Programming Language",
+	AuthorID:        alan.ID,
+	PublicationDate: publicationDate,
+}
+```
+Running `Marshal`:
+```go
+bookJSON, _ := jsonapi.Marshal(book1)
+authorJSON, _ := jsonapi.Marshal(alan)
+```
+
+Output:
+```json
+{
+	"data": {
+		"type": "books",
+		"id": "1",
+		"attributes": {
+			"title": "Go Programming Language",
+			"publication_date": "2015-01-01T00:00:00Z"
+		}
+	}
+}
+```
+
+and
+```json
+{
+	"data": {
+		"type": "authors",
+		"id": "1",
+		"attributes": {
+			"first_name": "Alan A. A.",
+			"last_name": "Donovan"
+		}
+	}
+}
+```
+
+##### Relationships
+Add `relationships` to resource is easy to do by implementing [MarshalRelationships interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalRelationships)
+e.g. for `Book` we will add `GetRelationships` function.
+```go
+func (b Book) GetRelationships() map[string]interface{} {
+	relationships := make(map[string]interface{})
+
+	relationships["author"] = jsonapi.ResourceObjectIdentifier{
+		ID:   b.AuthorID,
+		Type: "authors",
+	}
+
+	return relationships
+}
+```
+
+The `Marshal` output will be:
+
+```json
+{
+	"data": {
+		"type": "books",
+		"id": "1",
+		"attributes": {
+			"title": "Go Programming Language",
+			"publication_date": "2015-01-01T00:00:00Z"
+		},
+		"relationships": {
+			"author": {
+				"data": {
+					"type": "authors",
+					"id": "1"
+				}
+			}
+		}
+	}
+}
+```
+
+##### Included
+Adding to a json document `included` is easy by adding function `GetIncluded` it will implement [MarshalIncluded interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalIncluded).
+```go
+func (b Book) GetIncluded() []interface{} {
+	var included []interface{}
+
+  //`authors` a global array with all authors, but it can be a DB or something else
+	for _, author := range authors {
+		if author.ID == b.AuthorID {
+			included = append(included, author)
+		}
+	}
+
+	return included
+}
+```
+
+When json document is a collection of resources better way to implement additional data type and `Books` method `GetIncluded`, otherwise all same included resources may be included several times.
+```go
+type Books []Book
+
+func (b Books) GetIncluded() []interface{} {
+  //do something
+}
+```
+
+`Book` with `included` will be looks like:
+```json
+{
+	"data": {
+		"type": "books",
+		"id": "1",
+		"attributes": {
+			"title": "Go Programming Language",
+			"publication_date": "2015-01-01T00:00:00Z"
+		},
+		"relationships": {
+			"author": {
+				"data": {
+					"type": "authors",
+					"id": "1"
+				}
+			}
+		}
+	},
+	"included": [{
+		"type": "authors",
+		"id": "1",
+		"attributes": {
+			"first_name": "Alan A. A.",
+			"last_name": "Donovan"
+		}
+	}]
+}
+```
+
+##### Meta
+
+`Book`'s `GetMeta` will implement [MarshalMeta interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalMeta).
+`meta` section will be added to json document.
+
+```go
+func (b Book) GetMeta() interface{} {
+	return Meta{ ReadCount: 42 }
+}
+```
+
+the output:
+```json
+{
+	"data": {
+		"type": "books",
+		"id": "1",
+		"attributes": {
+			"title": "Go Programming Language",
+			"publication_date": "2015-01-01T00:00:00Z"
+		},
+		"meta": {
+			"read_count": 42
+		},
+		"relationships": {
+			"author": {
+				"data": {
+					"type": "authors",
+					"id": "1"
+				}
+			}
+		}
+	},
+	"included": [{
+		"type": "authors",
+		"id": "1",
+		"attributes": {
+			"first_name": "Alan A. A.",
+			"last_name": "Donovan"
+		}
+	}],
+	"meta": {
+		"read_count": 42
+	}
+}
+```
+
+Here we can find that `meta` includes in resource object and into json document.
+It happened, because resource and document may have their own `meta`, to avoid such behaviour we should implement `Book` document data type and implement `GetMeta` for the `Book`'s document.
+
+```go
+type BookDocumentMeta struct {
+	TotalCount int `json:"total_count"`
+}
+
+type BookDocument struct {
+  Data Book
+  Meta BookDocumentMeta
+}
+
+func (b BookDocument) GetData() interface{} {
+	return b.Data
+}
+
+func (b BookDocument) GetMeta() interface{} {
+	return b.Meta
+}
+
+...
+
+bookJSON, _ := jsonapi.Marshal(BookDocument{
+  Data: book, //book from previous examples
+  Meta: BookDocumentMeta{ 17 }, //let's imagine that we have 17 books in our library
+})
+```
+
+Output:
+
+```json
+{
+	"data": {
+		"type": "books",
+		"id": "1",
+		"attributes": {
+			"title": "Go Programming Language",
+			"publication_date": "2015-01-01T00:00:00Z"
+		},
+		"meta": {
+			"read_count": 42
+		},
+		"relationships": {
+			"author": {
+				"data": {
+					"type": "authors",
+					"id": "1"
+				}
+			}
+		}
+	},
+	"meta": {
+		"total_count": 17
+	}
+}
+```
+
+<!-- #### Unmarshal -->
+### Example Library client and server applications.
 
 server.go
 ```go

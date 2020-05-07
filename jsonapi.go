@@ -21,11 +21,13 @@ const ContentType = "application/vnd.api+json"
 //      return s.ID
 //    }
 //
+// GetType examples:
+//
 //    func(s SomeStruct) GetType() string {
 //      return d.Type
 //    }
 //
-// or
+//    or
 //
 //    func(s SomeStruct) GetType() string {
 //      return "some-resource-type"
