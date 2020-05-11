@@ -17,7 +17,7 @@ Go to jsonapi-go package directory and run:
 
 ### Usage
 #### Marshal
-For instance we have Go program what implements simple library, we have `Book` and `Author` structs:
+For instance we have Go program what implements a simple library, we have `Book` and `Author` structs:
 ```go
 type Book struct {
 	ID              string   
@@ -128,7 +128,7 @@ and
 ```
 
 ##### Relationships
-Add `relationships` to resource is easy to do by implementing [MarshalRelationships interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalRelationships)
+Add `relationships` to the resource is easy to do by implementing [MarshalRelationships interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalRelationships)
 e.g. for `Book` we will add `GetRelationships` function.
 ```go
 func (b Book) GetRelationships() map[string]interface{} {
@@ -167,7 +167,7 @@ The `Marshal` output will be:
 ```
 
 ##### Included
-Adding to a json document `included` is easy by adding function `GetIncluded` it will implement [MarshalIncluded interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalIncluded).
+Adding to JSON document `included` is easy by adding function `GetIncluded` it will implement [MarshalIncluded interface](https://godoc.org/github.com/pieoneers/jsonapi-go#MarshalIncluded).
 ```go
 func (b Book) GetIncluded() []interface{} {
 	var included []interface{}
@@ -183,7 +183,7 @@ func (b Book) GetIncluded() []interface{} {
 }
 ```
 
-When json document is a collection of resources better way to implement additional data type and `Books` method `GetIncluded`, otherwise all same included resources may be included several times.
+When JSON document is a collection of resources better way to implement additional data type and `Books` method `GetIncluded`, otherwise all same included resources may be included several times.
 ```go
 type Books []Book
 
@@ -269,8 +269,8 @@ the output:
 }
 ```
 
-Here we can find that `meta` includes in resource object and into json document.
-It happened, because resource and document may have their own `meta`, to avoid such behaviour we should implement `Book` document data type and implement `GetMeta` for the `Book`'s document.
+Here we can find that `meta` includes in resource object and into JSON document.
+It happened, because resource and document may have their own `meta`, to avoid such behavior we should implement `Book` document data type and implement `GetMeta` for the `Book`'s document.
 
 ```go
 type BookDocumentMeta struct {
@@ -327,7 +327,191 @@ Output:
 }
 ```
 
-<!-- #### Unmarshal -->
+#### Unmarshal
+
+Now we will implement the examples, how to put values from JSON document into Go struct.
+We will use the same data types `Book` and `Author`
+
+But the set of functions will be different.
+`Book`:
+```go
+type Book struct {
+	ID              string    `json:"-"`
+	Type            string    `json:"-"`
+	AuthorID        string    `json:"-"`
+	Title           string    `json:"title"`
+	PublicationDate time.Time `json:"publication_date"`
+}
+
+func (b *Book) SetID(id string) error {
+	b.ID = id
+	return nil
+}
+
+func (b *Book) SetType(t string) error {
+	b.Type = t
+	return nil
+}
+
+func (b *Book) SetData(to func(target interface{}) error) error {
+	return to(b)
+}
+
+```
+
+Here is JSON data:
+```json
+{
+  	"data": {
+  		"type": "books",
+  		"id": "1",
+  		"attributes": {
+  			"title": "Go Programming Language",
+  			"publication_date": "2015-01-01T00:00:00Z"
+  		},
+      "relationships": {
+        "author": {
+          "data": {
+            "type": "authors",
+            "id": "1"
+          }
+        }
+      }
+  	}
+  }
+```
+Let's call [Unmarshal](https://godoc.org/github.com/pieoneers/jsonapi-go#Unmarshal) function.
+
+
+```go
+  book := Book{}
+	jsonapi.Unmarshal(bookJSON, &book) //bookJSON is []byte of JSON data.
+```
+
+At the end we will have Go struct:
+```go
+_ = Book{
+  ID:	      "1",
+  Type:	    "books",
+  AuthorID:	"",
+  Title:	   "Go Programming Language"
+  PublicationDate:	2015-01-01 00:00:00 +0000 UTC,
+}
+```
+But the AuthorID is empty, to set this relationship we should implement [UnmarshalRelationships](https://godoc.org/github.com/pieoneers/jsonapi-go#UnmarshalRelationships) interface, by creating function SetRelationships:
+```go
+func (b *Book) SetRelationships(relationships map[string]interface{}) error {
+	if relationship, ok := relationships["author"]; ok {
+		b.AuthorID = relationship.(*jsonapi.ResourceObjectIdentifier).ID
+	}
+
+	return nil
+}
+```
+call Unmarshal again and look at the result.
+
+##### Collection unmarshal
+
+When you need to unmarshal collections, you should implement SetData function for collection datatype.
+```go
+type Books []Book
+
+func (b *Books) SetData(to func(target interface{}) error) error {
+	return to(b)
+}
+```
+If resource `Book` data type have SetRelationships function, in the collection all relationships will be filled.
+Example:
+
+```go
+var booksJSON = []byte(`
+  {
+  	"data":
+    [
+      {
+    		"type": "books",
+    		"id": "1",
+    		"attributes": {
+    			"title": "Go Programming Language",
+    			"publication_date": "2015-01-01T00:00:00Z"
+    		},
+    		"relationships": {
+    			"author": {
+    				"data": {
+    					"type": "authors",
+    					"id": "1"
+    				}
+    			}
+    		}
+    	},
+      {
+    		"type": "books",
+    		"id": "2",
+    		"attributes": {
+    			"title": "Learning Functional Programming in Go",
+    			"publication_date": "2017-11-01T00:00:00Z"
+    		},
+    		"relationships": {
+    			"author": {
+    				"data": {
+    					"type": "authors",
+    					"id": "2"
+    				}
+    			}
+    		}
+    	},
+      {
+    		"type": "books",
+    		"id": "3",
+    		"attributes": {
+    			"title": "Go in Action",
+    			"publication_date": "2015-11-01T00:00:00Z"
+    		},
+    		"relationships": {
+    			"author": {
+    				"data": {
+    					"type": "authors",
+    					"id": "3"
+    				}
+    			}
+    		}
+    	}
+    ]
+  }
+`)
+
+books := Books{}
+jsonapi.Unmarshal(booksJSON, &books)
+```
+
+The output:
+```go
+_ = Books{
+  {  
+    ID:	"1",
+    Type:	"books",
+    AuthorID:	"1",
+    Title:	"Go Programming Language",
+    PublicationDate:	2015-01-01 00:00:00 +0000 UTC,
+  },
+  {
+    ID:	"2",
+    Type:	"books",
+    AuthorID:	"2",
+    Title:	"Learning Functional Programming in Go",
+    PublicationDate:	2017-11-01 00:00:00 +0000 UTC,
+  },
+  {
+    ID:	"3",
+    Type:	"books",
+    AuthorID:	"3",
+    Title:	"Go in Action",
+    PublicationDate:	2015-11-01 00:00:00 +0000 UTC,
+  },
+}
+```
+
+
 ### Example Library client and server applications.
 
 server.go
